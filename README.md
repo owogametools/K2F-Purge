@@ -1,6 +1,10 @@
 # K2F PURGE
 
+**English** · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
+
 Offline incident response for the NIKKE PC launcher supply-chain compromise.
+
+**Source and releases:** [owogametools/K2F-Purge](https://github.com/owogametools/K2F-Purge) · [Releases](https://github.com/owogametools/K2F-Purge/releases)
 
 **Find the listed indicators. Block the infrastructure. Quarantine what landed. Inventory what may have been taken. Nothing leaves the machine.**
 
@@ -60,7 +64,7 @@ The footer carries a `NOT AN ANTIVIRUS · NO NETWORK` notice (translated when th
 
 ## Download
 
-Release builds, when published, are attached to [GitHub Releases](https://github.com/owogametools/K2F-Purge/releases). The repository becomes public after the first release. Building from source is the most direct way to verify a binary.
+Release builds are attached to [GitHub Releases](https://github.com/owogametools/K2F-Purge/releases). The source and release repository is public at [owogametools/K2F-Purge](https://github.com/owogametools/K2F-Purge). Building from source is the most direct way to verify a binary.
 
 ## Build
 
