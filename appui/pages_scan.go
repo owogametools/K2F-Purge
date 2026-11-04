@@ -2,6 +2,7 @@ package appui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
@@ -18,6 +19,16 @@ func coverage(c *ui.Context, num, title, detail string) {
 }
 
 func (a *App) scanPage(c *ui.Context) {
+	// Follow the end of the stream when it grows, unless the reader scrolled
+	// up. Only content changes may move the view: writing the offset on every
+	// frame would cancel a wheel notch the reader just started.
+	if n := len(a.ScanLog); n != a.logSeen {
+		a.logSeen = n
+		if n == 0 || a.LogScroll.Y >= a.LogScroll.MaxY {
+			a.LogScroll.Y = math.MaxFloat32
+		}
+	}
+
 	ui.Column(c).Gap(18).Children(func() {
 		ui.Row(c).AlignItems(ui.End).Children(func() {
 			ui.Column(c).Gap(2).Children(func() {
@@ -71,7 +82,7 @@ func (a *App) scanPage(c *ui.Context) {
 			})
 		}
 
-		p := panel(c).Height(272)
+		p := panel(c).Height(272).Clip()
 		p.Children(func() {
 			ui.Row(c).AlignItems(ui.Center).Children(func() {
 				micro(c, tr("Live evidence stream", "即時證據流", "証拠ストリーム"), colDim)
@@ -79,27 +90,29 @@ func (a *App) scanPage(c *ui.Context) {
 				mono(c, trf("%d lines", "%d 行", "%d 行", len(a.ScanLog)), 9, colDim)
 			})
 			ui.Box(c).Height(1).FillWidth().Background(colLineSoft)
-			ui.Column(c).Gap(3).Children(func() {
-				start := 0
-				if len(a.ScanLog) > 16 {
-					start = len(a.ScanLog) - 16
-				}
-				if len(a.ScanLog) == 0 {
-					mono(c, tr("waiting for the first pass…", "等待首輪結果…", "初回の結果を待っています…"), 10, colDim)
-					return
-				}
-				for _, line := range a.ScanLog[start:] {
-					color := colMuted
-					switch {
-					case strings.HasPrefix(line, "HIT"):
-						color = colAcid
-					case strings.HasPrefix(line, "ERROR"):
-						color = colDanger
-					case strings.HasPrefix(line, "target"):
-						color = colDim
+			ui.Scroll(c).Grow(1).TrackScroll(&a.LogScroll).Children(func() {
+				ui.Column(c).Gap(3).Children(func() {
+					start := 0
+					if len(a.ScanLog) > 16 {
+						start = len(a.ScanLog) - 16
 					}
-					mono(c, line, 10, color).SingleLine()
-				}
+					if len(a.ScanLog) == 0 {
+						mono(c, tr("waiting for the first pass…", "等待首輪結果…", "初回の結果を待っています…"), 10, colDim)
+						return
+					}
+					for _, line := range a.ScanLog[start:] {
+						color := colMuted
+						switch {
+						case strings.HasPrefix(line, "HIT"):
+							color = colAcid
+						case strings.HasPrefix(line, "ERROR"):
+							color = colDanger
+						case strings.HasPrefix(line, "target"):
+							color = colDim
+						}
+						mono(c, line, 10, color).SingleLine()
+					}
+				})
 			})
 		})
 

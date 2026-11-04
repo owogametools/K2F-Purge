@@ -4,6 +4,7 @@ package appui
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,6 +47,10 @@ type App struct {
 
 	Page Page
 	Err  string
+	Lang langPref
+
+	LogScroll ui.ScrollState
+	logSeen   int
 
 	Busy      bool
 	BusyLabel string
@@ -83,6 +88,7 @@ func New(info model.AppInfo, svc *service.Service) *App {
 		Info:      info,
 		Svc:       svc,
 		Page:      PageScan,
+		Lang:      currentLangPref(),
 		CleanSel:  map[string]bool{},
 		BlockPlan: svc.BlockPlan(),
 		Started:   time.Now(),
@@ -100,7 +106,7 @@ func (a *App) View(c *ui.Context) {
 
 	ui.Column(c).Fill().Background(colBG).Draw(drawGrain).Children(func() {
 		a.titleBar(c)
-		ui.Row(c).Fill().Children(func() {
+		ui.Row(c).Grow(1).FillWidth().Children(func() {
 			a.rail(c)
 			a.stage(c)
 		})
@@ -198,6 +204,8 @@ func (a *App) startScan() {
 	a.BusyLabel = tr("Scanning", "掃描中", "走査中")
 	a.Err = ""
 	a.ScanLog = nil
+	a.logSeen = 0
+	a.LogScroll.Y = math.MaxFloat32
 	a.Scan = nil
 	a.Targets = nil
 	a.FindingCount = 0

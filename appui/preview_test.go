@@ -1,6 +1,7 @@
 package appui
 
 import (
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -23,7 +24,7 @@ func TestPreview(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	svc, err := service.New("K2F PURGE", "0.1.0", "windows", "amd64", "bee")
+	svc, err := service.New("K2F PURGE", "0.2.0", "windows", "amd64", "bee")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +73,15 @@ func previewApp(t *testing.T, svc *service.Service, now time.Time) *App {
 		},
 		Limitations: []string{"The launcher install folder was not found; only the data folder was checked."},
 	}
+	a.Targets = a.Scan.Targets
+	for i := 0; i < 18; i++ {
+		a.ScanLog = append(a.ScanLog, fmt.Sprintf(`target  launcher-data  C:\Users\bee\AppData\Roaming\nikke_launcher\tbs_cache\data_%02d`, i))
+	}
+	a.ScanLog = append(a.ScanLog,
+		`HIT     log.k2f_chan  C:\Users\bee\AppData\Local\NIKKE\Launcher\intl_service\debug.log`,
+		`ERROR   read C:\Users\bee\AppData\Local\Temp\locked: access denied`,
+	)
+
 	a.Block = &model.BlockStatus{
 		HostsApplied: true,
 		HostsPath:    `C:\Windows\System32\drivers\etc\hosts`,

@@ -18,15 +18,16 @@ const (
 )
 
 var (
-	langOnce sync.Once
-	uiLang   lang
+	langOnce      sync.Once
+	uiLang        lang
+	langPrefValue langPref
 )
 
 // tr says the text in the language the app shows: Japanese, Traditional
-// Chinese, or English, in that order of preference when the system asks
-// for one of them. An empty translation falls back to English.
+// Chinese, or English. The user's stored choice wins; auto asks the system.
+// An empty translation falls back to English.
 //
-// K2F_UI_LANG, when set, is read first and wins over i18n.Locale.
+// K2F_UI_LANG, when set, is read first and wins over the stored choice.
 // LANG/LC_ALL do not change i18n.Locale on Windows; this env hook is how
 // tests render a chosen language. "ja" and "ja-JP" force Japanese;
 // "zh-Hant" and "zh-TW" force Traditional Chinese; "en" forces English.
@@ -61,12 +62,33 @@ func pick3(en, zh, ja string) string {
 	return en
 }
 
+// resolveLang reads the stored choice once. K2F_UI_LANG still wins so tests
+// and previews can pin a language; otherwise the stored choice decides, and
+// auto follows the system locale.
 func resolveLang() {
-	tag := strings.TrimSpace(os.Getenv("K2F_UI_LANG"))
-	if tag == "" {
-		tag = i18n.Locale()
+	langPrefValue = loadLangPref()
+	if tag := strings.TrimSpace(os.Getenv("K2F_UI_LANG")); tag != "" {
+		uiLang = classifyTag(tag)
+		return
 	}
-	uiLang = classifyTag(tag)
+	uiLang = langPrefValue.resolve()
+}
+
+// currentLangPref is the choice the menu shows.
+func currentLangPref() langPref {
+	langOnce.Do(resolveLang)
+	return langPrefValue
+}
+
+// setLangPref applies p for this session and stores it. A failing save is
+// reported to the caller; the session still switches.
+func setLangPref(p langPref) error {
+	langOnce.Do(resolveLang)
+	langPrefValue = p
+	if strings.TrimSpace(os.Getenv("K2F_UI_LANG")) == "" {
+		uiLang = p.resolve()
+	}
+	return saveLangPref(p)
 }
 
 func classifyTag(tag string) lang {

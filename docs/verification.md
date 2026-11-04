@@ -19,10 +19,10 @@ go tool mygo build
 
 Expected:
 
-- All tests pass. On Windows, the 0.1.0 suite reports 96 passing tests across 12 packages. On other platforms, use "all tests pass" as the criterion; the platform-specific test set differs.
+- All tests pass. On Windows, the 0.2.0 suite reports 110 passing tests across 12 packages. On other platforms, use "all tests pass" as the criterion; the platform-specific test set differs.
 - Both cross-builds complete.
 - The cgo-disabled build completes.
-- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe` and `build/windows-amd64/k2f-purge-setup-0.1.0-amd64.exe`.
+- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe` and `build/windows-amd64/k2f-purge-setup-0.2.0-amd64.exe`.
 
 The last command needs Go 1.27.3 because `go.mod` pins the mygo build tool with a `tool` directive.
 

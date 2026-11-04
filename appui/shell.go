@@ -67,8 +67,55 @@ func (a *App) rail(c *ui.Context) {
 				mono(c, a.Info.RulesetVersion, 10, colMuted)
 				micro(c, tr("Host", "主機", "ホスト"), colDim).Margin(6, 0, 0, 0)
 				mono(c, a.Info.OS+"/"+a.Info.Arch, 10, colMuted)
+				micro(c, tr("Language", "語言", "言語"), colDim).Margin(6, 0, 0, 0)
+				a.langMenu(c)
 			})
 		})
+}
+
+// langMenu is the select under HOST. It keeps the K2F look instead of the
+// theme's default widget.
+func (a *App) langMenu(c *ui.Context) {
+	sel := ui.SelectBase(c, &a.Lang)
+	current := langPrefLabel(a.Lang)
+
+	trig := sel.Trigger.Height(26).FillWidth().Padding(0, 8).
+		Radius(6).Border(1, colLineSoft).Background(colSurface).Value(current)
+	if trig.Hovered() {
+		trig.Background(colSurface2)
+	}
+	trig.Children(func() {
+		mono(c, current, 9, colMuted)
+		ui.Spacer(c)
+		mono(c, "▾", 9, colDim)
+	})
+
+	sel.Popup(func(p ui.Element) {
+		p.Padding(4).Width(190).Background(colSurface).Radius(8).Border(1, colLineSoft)
+		for _, pref := range []langPref{langPrefAuto, langPrefEN, langPrefZH, langPrefJA} {
+			fg := colMuted
+			if pref == a.Lang {
+				fg = colInk
+			}
+			item := sel.Item(pref).Height(28).Padding(0, 8).Radius(5)
+			if item.Highlighted() {
+				item.Background(colSurface2)
+			}
+			item.Children(func() {
+				mono(c, langPrefLabel(pref), 9, fg)
+				ui.Spacer(c)
+				if pref == a.Lang {
+					ui.Box(c).Size(4, 4).Radius(2).Background(colAcid)
+				}
+			})
+		}
+	})
+
+	if sel.Trigger.Changed() {
+		if err := setLangPref(a.Lang); err != nil {
+			a.Err = err.Error()
+		}
+	}
 }
 
 func (a *App) railItem(c *ui.Context, p Page) {

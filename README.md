@@ -74,7 +74,7 @@ go tool mygo build
 On Windows this writes:
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.1.0-amd64.exe` (NSIS installer)
+- `build/windows-amd64/k2f-purge-setup-0.2.0-amd64.exe` (NSIS installer)
 
 Cross-compilation:
 
@@ -85,7 +85,7 @@ go tool mygo build -platform darwin/universal
 
 A signed macOS `.app`/`.dmg` must be produced on macOS. Running the mygo tool for Linux also produces a tarball, Debian package, and PKGBUILD. If NSIS is not installed on Windows, the mygo build tool downloads it; that is a build-time step, not application behavior.
 
-On Windows at the 0.1.0 release, `go test ./...` reports 96 passing tests across 12 packages. `GOOS=linux go build ./...` and `GOOS=darwin go build ./...` also complete.
+On Windows at the 0.2.0 release, `go test ./...` reports 110 passing tests across 12 packages. `GOOS=linux go build ./...` and `GOOS=darwin go build ./...` also complete.
 
 ## Verify it yourself
 

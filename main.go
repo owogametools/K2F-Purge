@@ -41,7 +41,7 @@ func main() {
 		appVersion = mygo.App.Version()
 	}
 	if appVersion == "" {
-		appVersion = "0.1.0"
+		appVersion = "0.2.0"
 	}
 	username := ""
 	if u, err := user.Current(); err == nil {
