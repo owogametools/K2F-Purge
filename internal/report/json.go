@@ -106,6 +106,36 @@ type jsonExposure struct {
 	Limitations []string           `json:"limitations"`
 	Categories  []jsonCategory     `json:"categories"`
 	Items       []jsonExposureItem `json:"items"`
+	Secrets     *jsonSecretScan    `json:"secrets,omitempty"`
+	AstrLink    *jsonSecretScan    `json:"astrlink,omitempty"`
+}
+
+type jsonSecretScan struct {
+	StartedAt    string              `json:"started_at"`
+	FinishedAt   string              `json:"finished_at"`
+	FilesScanned int                 `json:"files_scanned"`
+	FilesSkipped int                 `json:"files_skipped"`
+	BytesRead    int64               `json:"bytes_read"`
+	Limitations  []string            `json:"limitations"`
+	Findings     []jsonSecretFinding `json:"findings"`
+}
+
+type jsonSecretFinding struct {
+	Engine      string  `json:"engine"`
+	RuleID      string  `json:"rule_id"`
+	Provider    string  `json:"provider"`
+	Kind        string  `json:"kind"`
+	Severity    string  `json:"severity"`
+	Confidence  string  `json:"confidence"`
+	Path        string  `json:"path"`
+	Line        int     `json:"line"`
+	Column      int     `json:"column"`
+	Value       string  `json:"value"`
+	Masked      string  `json:"masked"`
+	Fingerprint string  `json:"fingerprint"`
+	Score       float64 `json:"score,omitempty"`
+	Note        string  `json:"note,omitempty"`
+	Action      string  `json:"action,omitempty"`
 }
 
 type jsonCategory struct {
@@ -239,12 +269,38 @@ func JSON(r model.ReportData) ([]byte, error) {
 				Exists: it.Exists, Size: it.Size, MTime: ts(it.MTime), Note: it.Note,
 			})
 		}
+		je.Secrets = toJSONSecretScan(r.Exposure.Secrets)
+		je.AstrLink = toJSONSecretScan(r.Exposure.AstrLink)
 		env.Exposure = je
 	}
 	for _, a := range r.Actions {
 		env.Actions = append(env.Actions, jsonAction{At: ts(a.At), Kind: a.Kind, Detail: a.Detail})
 	}
 	return json.MarshalIndent(env, "", "  ")
+}
+
+func toJSONSecretScan(s *model.SecretResult) *jsonSecretScan {
+	if s == nil {
+		return nil
+	}
+	out := &jsonSecretScan{
+		StartedAt:    ts(s.StartedAt),
+		FinishedAt:   ts(s.FinishedAt),
+		FilesScanned: s.FilesScanned,
+		FilesSkipped: s.FilesSkipped,
+		BytesRead:    s.BytesRead,
+		Limitations:  nonNil(s.Limitations),
+		Findings:     make([]jsonSecretFinding, 0, len(s.Findings)),
+	}
+	for _, f := range s.Findings {
+		out.Findings = append(out.Findings, jsonSecretFinding{
+			Engine: f.Engine, RuleID: f.RuleID, Provider: f.Provider, Kind: f.Kind,
+			Severity: f.Severity, Confidence: f.Confidence, Path: f.Path,
+			Line: f.Line, Column: f.Column, Value: f.Value, Masked: f.Masked,
+			Fingerprint: f.Fingerprint, Score: f.Score, Note: f.Note, Action: f.Action,
+		})
+	}
+	return out
 }
 
 func ts(t time.Time) string {

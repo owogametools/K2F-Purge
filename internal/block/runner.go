@@ -24,6 +24,7 @@ func (execRunner) Run(ctx context.Context, name string, args ...string) (string,
 		return "", "", fmt.Errorf("refusing to run shelled command name %q", name)
 	}
 	cmd := exec.CommandContext(ctx, name, args...)
+	hideConsole(cmd)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

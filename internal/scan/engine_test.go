@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -214,9 +215,15 @@ func TestRun_SnippetLimitAndEvents(t *testing.T) {
 	_, p := fixturePaths(t, "windows")
 	writeCleanLauncher(t, p)
 	mustWrite(t, launcherLog(p), strings.Repeat("A", 400)+"k2f_chan registered"+strings.Repeat("B", 400)+"\x00\x01")
-	var events []model.ScanEvent
+	// Workers emit concurrently; the collector is the test's own state.
+	var (
+		mu     sync.Mutex
+		events []model.ScanEvent
+	)
 	res, err := RunWithPaths(context.Background(), p, nil, model.ScanOptions{}, func(ev model.ScanEvent) {
+		mu.Lock()
 		events = append(events, ev)
+		mu.Unlock()
 	})
 	if err != nil {
 		t.Fatal(err)

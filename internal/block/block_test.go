@@ -18,6 +18,9 @@ func TestPlanDefaultsAndIPValidation(t *testing.T) {
 	if !p.UseHosts || !p.UseFirewall || !p.Persist || !p.FlushDNS {
 		t.Fatalf("flags %+v", p)
 	}
+	if p.BlockTBSBrowser || len(p.ProgramPaths) != 0 {
+		t.Fatalf("tbs_browser block must be opt-in: %+v", p)
+	}
 	if len(p.Domains) != 5 {
 		t.Fatalf("domains %v", p.Domains)
 	}
@@ -204,6 +207,34 @@ func TestCommandsNotShelled(t *testing.T) {
 				t.Fatalf("args look shelled: %q %v", c.name, c.args)
 			}
 		}
+	}
+}
+
+func TestApplyWithoutProgramPathsRunsNoProgramRules(t *testing.T) {
+	withHosts(t, "")
+	rec := &recordRunner{}
+	runner = rec
+	usingTestRunner = true
+	t.Cleanup(func() {
+		runner = execRunner{}
+		usingTestRunner = false
+	})
+	p := Plan(nil, []string{"89.127.233.127"})
+	p.UseHosts = false
+	p.FlushDNS = false
+	_, err := Apply(context.Background(), p, func(model.Progress) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range rec.calls {
+		joined := c.name + " " + strings.Join(c.args, " ")
+		if strings.Contains(joined, "tbs_browser") {
+			t.Fatalf("program rule ran without a resolved path: %s", joined)
+		}
+	}
+	v := Verify(context.Background(), false)
+	if len(v.ProgramNotes) != 0 || v.ProgramOK {
+		t.Fatalf("program verify must be off unless expected: %+v", v)
 	}
 }
 

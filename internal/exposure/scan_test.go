@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/owogametools/k2f-purge/internal/model"
@@ -20,9 +21,15 @@ func TestScanWithHomeLstatOnly(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(secret, 0o600) })
 
-	var progress []model.Progress
+	// Workers report progress concurrently; the collector is the test's state.
+	var (
+		mu       sync.Mutex
+		progress []model.Progress
+	)
 	res, err := ScanWithHome(context.Background(), home, model.ExposureOptions{}, func(p model.Progress) {
+		mu.Lock()
 		progress = append(progress, p)
+		mu.Unlock()
 	})
 	if err != nil {
 		t.Fatalf("ScanWithHome: %v", err)

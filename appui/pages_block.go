@@ -1,6 +1,8 @@
 package appui
 
 import (
+	"runtime"
+
 	"github.com/egoist/mygo/ui"
 )
 
@@ -20,6 +22,7 @@ func (a *App) blockPage(c *ui.Context) {
 				ui.Checkbox(c, &a.BlockPlan.UseFirewall, tr("Firewall — outbound IPs", "防火牆 — 出站 IP", "Firewall — 送信 IP")).Label(tr("Firewall", "防火牆", "Firewall"))
 				ui.Checkbox(c, &a.BlockPlan.Persist, tr("Keep the firewall rules after reboot", "重開機後保留規則", "再起動後も規則を保持")).Label(tr("Persist", "持久化", "永続"))
 				ui.Checkbox(c, &a.BlockPlan.FlushDNS, tr("Flush the DNS cache", "清除 DNS 快取", "DNS キャッシュを消去")).Label(tr("Flush DNS", "清 DNS", "DNS消去"))
+				a.tbsBrowserOption(c)
 				ui.Spacer(c)
 				ui.Row(c).Gap(8).Children(func() {
 					if a.Busy {
@@ -79,17 +82,63 @@ func (a *App) blockPage(c *ui.Context) {
 				for _, n := range a.Verify.FirewallNotes {
 					mono(c, "  "+n, 20, colDim).SingleLine()
 				}
+				// Only show the program line once a check actually produced
+				// notes, so ticking the box does not fake a failed verify.
+				if len(a.Verify.ProgramNotes) > 0 {
+					a.statusLine(c, tr("tbs_browser.exe rules are present", "tbs_browser.exe 規則已在", "tbs_browser.exe ルールあり"), a.Verify.ProgramOK, "")
+					for _, n := range a.Verify.ProgramNotes {
+						mono(c, "  "+n, 20, colDim).SingleLine()
+					}
+				}
 			})
 		}
 		ui.Row(c).Gap(10).Children(func() {
-			a.ghostButton(c, tr("Verify", "驗證", "検証"), func() {
-				v := a.Svc.BlockVerify()
+			a.actionButton(c, tr("Continue to cleanup", "繼續清理", "清掃へ進む"), true, func() { a.Page = PageClean })
+			ui.Spacer(c)
+			a.ghostButton(c, tr("Re-verify", "重新驗證", "再検証"), func() {
+				expectProgram := a.BlockPlan.BlockTBSBrowser || len(a.BlockPlan.ProgramPaths) > 0
+				v := a.Svc.BlockVerify(expectProgram)
 				a.Verify = &v
 			})
-			ui.Spacer(c)
-			a.ghostButton(c, tr("Continue to cleanup", "繼續清理", "清掃へ進む"), func() { a.Page = PageClean })
 		})
 	})
+}
+
+// isWindows keeps the tbs_browser option on the platform whose firewall can
+// match a program. Info.OS is set from runtime.GOOS in main.
+func (a *App) isWindows() bool {
+	if a.Info.OS != "" {
+		return a.Info.OS == "windows"
+	}
+	return runtime.GOOS == "windows"
+}
+
+// tbsBrowserOption is the opt-in program block. It resolves the exe for
+// display and warns before the user turns it on.
+func (a *App) tbsBrowserOption(c *ui.Context) {
+	if !a.isWindows() {
+		mono(c, tr("Blocking tbs_browser.exe is Windows only.", "封鎖 tbs_browser.exe 僅限 Windows。", "tbs_browser.exe の遮断は Windows のみです。"), 20, colDim).SingleLine()
+		return
+	}
+	ui.Checkbox(c, &a.BlockPlan.BlockTBSBrowser, tr("Block tbs_browser.exe network access", "封鎖 tbs_browser.exe 網路存取", "tbs_browser.exe の通信を遮断")).
+		Label(tr("tbs_browser.exe", "tbs_browser.exe", "tbs_browser.exe"))
+
+	exe := a.TBSExe
+	if a.Svc != nil {
+		if p, ok := a.Svc.TBSBrowserPath(a.ScanOpts.ExtraLauncherDirs); ok {
+			exe = p
+			a.TBSExe = p
+		} else {
+			exe = ""
+			a.TBSExe = ""
+		}
+	}
+	if exe == "" {
+		mono(c, tr("tbs_browser.exe was not found; set the launcher folder on the verdict page.", "找不到 tbs_browser.exe；請在判定頁設定啟動器資料夾。", "tbs_browser.exe が見つかりません。判定ページでランチャーのフォルダを設定してください。"), 20, colWarn).SingleLine()
+	} else {
+		mono(c, clamp(exe, 120), 20, colDim).SingleLine()
+	}
+	mono(c, tr("This can break the launcher's embedded web content and updates. Both outbound and inbound are blocked.", "這可能讓啟動器的內嵌網頁與更新失效。出站與入站都會封鎖。", "ランチャーの埋め込み Web と更新が壊れる場合があります。送受信の両方を遮断します。"), 20, colWarn)
 }
 
 func (a *App) statusLine(c *ui.Context, label string, ok bool, detail string) {

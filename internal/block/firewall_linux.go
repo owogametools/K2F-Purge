@@ -267,3 +267,17 @@ func flushDNS(ctx context.Context) error {
 	}
 	return fmt.Errorf("no resolvectl/systemd-resolve")
 }
+
+// Program blocking is Windows-only (the launcher's egress browser runs as a
+// Windows process). The interface never offers the option here.
+func applyProgramFirewall(ctx context.Context, programs []string) (rules []model.FirewallRule, warnings, failures []string) {
+	return nil, nil, []string{"tbs_browser.exe blocking is supported on Windows only"}
+}
+
+func removeProgramFirewall(ctx context.Context) (warnings, failures []string) {
+	return nil, nil
+}
+
+func verifyProgramFirewall(ctx context.Context) (bool, []string) {
+	return false, []string{"tbs_browser.exe blocking is supported on Windows only"}
+}

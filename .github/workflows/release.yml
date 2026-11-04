@@ -64,6 +64,22 @@ jobs:
       - name: Test
         run: go test ./...
 
+      # The 37 MiB model is fetched at build time, verified by size + sha256,
+      # and then copied next to the exe and into the NSIS installer by mygo.
+      - name: Fetch AstrLink model (Windows)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/fetch-astrlink.ps1
+
+      - name: Fetch AstrLink model (Unix)
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/fetch-astrlink.sh
+
       - name: Build (Windows, mygo)
         if: matrix.goos == 'windows'
         shell: pwsh
@@ -105,7 +121,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $zip = 'dist/k2f-purge-${{ matrix.target }}.zip'
           if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
-          # Zip contains the portable exe and the NSIS installer, both at zip root.
+          # Zip contains the portable exe, the NSIS installer, the verified
+          # astrlink-guard/ directory, and the third-party notices required
+          # for redistributing the model.
+          Copy-Item -LiteralPath 'THIRD_PARTY_NOTICES.md' -Destination 'build/windows-amd64/THIRD_PARTY_NOTICES.md' -Force
           Compress-Archive -Path 'build/windows-amd64/*' -DestinationPath $zip -Force
           Get-Item -LiteralPath $zip | Format-List Name, Length, FullName
 
@@ -115,8 +134,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
+          # Ship the verified model directory next to the binary, matching the
+          # runtime lookup at <exe dir>/astrlink-guard/<rev12>/.
           # COPYFILE_DISABLE keeps macOS tar from injecting AppleDouble ._* files.
-          COPYFILE_DISABLE=1 tar -czf "dist/k2f-purge-${{ matrix.target }}.tar.gz" k2f-purge
+          COPYFILE_DISABLE=1 tar -czf "dist/k2f-purge-${{ matrix.target }}.tar.gz" \
+            -C "$PWD" k2f-purge THIRD_PARTY_NOTICES.md \
+            -C "$PWD/resources" astrlink-guard
           ls -la "dist/k2f-purge-${{ matrix.target }}.tar.gz"
 
       # One Release, many jobs: every matrix cell uploads its own asset.

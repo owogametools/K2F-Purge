@@ -14,19 +14,21 @@ go test ./...
 GOOS=linux GOARCH=amd64 go build ./...
 GOOS=darwin GOARCH=amd64 go build ./...
 CGO_ENABLED=0 go build ./...
+sh scripts/fetch-astrlink.sh   # Windows: pwsh -File scripts/fetch-astrlink.ps1
 go tool mygo build
 ```
 
 Expected:
 
-- All tests pass. On Windows, the 0.2.1 suite reports 110 passing tests across 12 packages. On other platforms, use "all tests pass" as the criterion; the platform-specific test set differs.
+- All tests pass. On other platforms, use "all tests pass" as the criterion; the platform-specific test set differs.
 - Both cross-builds complete.
 - The cgo-disabled build completes.
-- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe` and `build/windows-amd64/k2f-purge-setup-0.2.1-amd64.exe`.
+- The fetch script downloads the three model files into `resources/astrlink-guard/7216b6a3b897/`, verifies the exact size and SHA-256 listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md), and skips files that are already valid. Re-running it is a no-op.
+- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe`, `build/windows-amd64/k2f-purge-setup-0.3.1-amd64.exe`, and copies `astrlink-guard/7216b6a3b897/` next to the exe.
 
 The last command needs Go 1.27.3 because `go.mod` pins the mygo build tool with a `tool` directive.
 
-CI (`.github/workflows/ci.yml`) runs `gofmt -l`, `go vet ./...`, `go test ./...`, and cgo-disabled Linux and macOS cross-builds on every push and pull request. The tag-driven release workflow builds the Windows app with mygo and packages plain Linux and macOS binaries.
+CI (`.github/workflows/ci.yml`) runs `gofmt -l`, `go vet ./...`, `go test ./...`, and cgo-disabled Linux and macOS cross-builds on every push and pull request. The tag-driven release workflow fetches and verifies the model before building, then includes it in the Windows zip/installer and in the Linux and macOS tarballs.
 
 ## 2. Compare the ruleset with the public record
 
@@ -90,6 +92,8 @@ grep -RInE 'sentry|crashpad|bugsnag|rollbar|opentelemetry|telemetry' --include='
 Expected: no application telemetry. `internal/exposure/catalog.go` contains a `~/.sentryclirc` credential path; that is a catalog entry for the Sentry CLI, not a crash reporter.
 
 The block verifier deliberately avoids DNS resolution. `internal/block/block.go` calls `Verify` and comments that a `LookupHost` of an unblocked name would leak DNS. Hosts verification reads the local hosts file instead.
+
+The only Hugging Face download URL is in `scripts/fetch-astrlink.sh` and `scripts/fetch-astrlink.ps1`, which run at build time. No Go source references a download host or performs a runtime fetch.
 
 ## 4. Confirm there is no cgo and no webview
 
@@ -277,18 +281,48 @@ fc /b "%TEMP%\hkml-before.reg" "%TEMP%\hkml-after.reg"
 
 Expected: no difference. The HKLM key is the legitimate Windows Parental Controls component (`wpc.dll`) and is never queried for deletion.
 
-## 10. Confirm exposure checks are metadata-only
+## 10. Confirm the exposure path catalogue check is metadata-only
 
 ```sh
 grep -RInE 'os\.(Open|ReadFile)\(' internal/exposure --include='*.go' | grep -v _test.go
 go test ./internal/exposure -run TestScanWithHomeLstatOnly -v
 ```
 
-Expected: the grep produces no output; the test passes. `internal/exposure/scan.go` uses `os.Lstat`, glob expansion, and `os.ReadDir`. `os.ReadDir` returns directory entries, not file contents.
+Expected: the grep produces no output; the test passes. `internal/exposure/scan.go` uses `os.Lstat`, glob expansion, and `os.ReadDir`. `os.ReadDir` returns directory entries, not file contents. This covers the default catalogue check only; the separate opt-in content scans are checked in section 11.
 
 For a runtime check, use Process Monitor on Windows with a filter for the catalog paths and the `ReadFile` operation. Expected: no `ReadFile` on credential files, only metadata queries. On Linux, `strace -f -e trace=openat,newfstatat,lstat` will show directory opens for enumeration; look for opens of the credential files themselves and expect none.
 
-## 11. Confirm the scan is read-only
+## 11. Confirm exposure content scans are explicit and bounded
+
+The two content actions are separate from the catalogue check and must never start on their own. Inspect the service entry points and UI call sites:
+
+```sh
+grep -RIn 'SecretScan\|AstrLinkScan' internal/service appui --include='*.go'
+```
+
+Expected: `appui/pages_exposure.go` calls them only from button handlers. `internal/service` returns an error when no exposure result exists. Nothing runs at startup.
+
+Inspect the scan limits and the separation between full and masked values:
+
+```sh
+grep -RIn '4096\|2000\|64 << 20\|8 << 20\|256 << 10\|512\|perFileWindows' internal/secrets internal/astrlink
+grep -RIn 'Masked\|Fingerprint' internal/secrets internal/astrlink internal/service --include='*.go'
+```
+
+Expected: the rule scanner enforces 4,096 files, 2,000 findings, and 64 MiB total (8 MiB per file). The model scanner enforces 256 KiB per file, 8 windows per file, 8 MiB total, and 512 windows global. Files cut by the per-file window cap are counted in `Limitations`. Action records contain only finding counts; logs and error messages use `Masked` or omit the value. `Value` is only consumed by the interface and the checklist/report writers.
+
+Confirm the export warning and full-value export:
+
+```sh
+grep -RIn '完整 secret\|complete secret\|full secret' internal/exposure internal/report
+go test ./internal/service ./internal/exposure ./internal/report
+```
+
+Expected: saved checklists and reports carry a warning that the file contains complete secrets, and the tests assert that an export contains `Value` while stored actions do not.
+
+Run a fixture check with a fake key, never a live key. Open EXPOSURE, run the catalogue check, press **Scan contents**, and confirm the fake value appears in full in the interface and in a checklist or report you save. Application logs and error messages must show only the masked form. Then press **Show leaked content** with the model directory absent: the button must report the reason and run no inference.
+
+## 12. Confirm the scan is read-only
 
 ```sh
 grep -RInE 'os\.(WriteFile|Create|Mkdir|MkdirAll|Remove|RemoveAll|Rename)\(' internal/scan --include='*.go' | grep -v _test.go
@@ -299,7 +333,7 @@ Expected: the grep produces no output; the test passes. The only external comman
 
 For a runtime check, snapshot the hashes and timestamps of a launcher directory before and after a scan. Expected: no changes. Process Monitor can also be filtered to write operations from the app during Scan.
 
-## 12. Confirm reports stay local
+## 13. Confirm reports stay local
 
 1. Run a scan and open REPORT.
 2. Save the report to a directory you choose.
@@ -308,7 +342,7 @@ For a runtime check, snapshot the hashes and timestamps of a launcher directory 
 
 The report writer (`internal/report/save.go`) creates both files in the chosen directory. The save dialog is the only path input. The exposure checklist is written to the single path you choose in its save dialog. No other component sends data off the machine.
 
-## 13. Check the elevated-op path
+## 14. Check the elevated-op path
 
 Inspect the whitelist and transports:
 
@@ -335,7 +369,7 @@ grep -RIn 'RunPrivileged' internal/service appui main.go
 
 Expected: `internal/service/service.go` calls `elev.RunPrivileged` from `runBlockOp` for `block.apply` and `block.remove` when `elev.Mode()` is `per-op`, which is the Linux/macOS non-root case. Clean operations still call `clean.Apply` in-process; they can move user-owned launcher files without elevation, but privileged actions report permission failures. On Windows, a declined UAC prompt leaves the app in `limited` mode, which does not use the per-op path. Scan, exposure, and report do not need elevation.
 
-## 14. What these checks do not prove
+## 15. What these checks do not prove
 
 - They do not prove the machine is free of malware. Detection is limited to the published IOCs and the places the scanner looks.
 - They do not prove the agent never ran or never exfiltrated data. The launcher log does not record the commands the operator executed.

@@ -48,12 +48,14 @@ func (a *App) exposurePage(c *ui.Context) {
 		ui.Column(c).Gap(2).Children(func() {
 			micro(c, tr("Step 05 / Exposure", "步驟 05 / 曝險", "手順 05 / 露出"), colAcid)
 			display(c, "EXPOSURE", 86, colInk)
-			mono(c, tr("If the agent ran, assume every secret below was readable. This list only checks whether the path exists.", "若 agent 曾執行，下列機密都可能被讀。只檢查路徑是否存在。", "エージェントが動いていれば、以下の機密は読まれた前提です。経路の有無だけ確認します。"), 24, colMuted)
+			mono(c, tr("The path list only checks existence. A content scan is a separate, explicit action that reads those files.",
+				"下方路徑清單只檢查存在。內容掃描是另一個需你明確啟動的動作，會讀取這些檔案。",
+				"下の経路一覧は存在だけを確認します。内容スキャンは別の明示的な操作で、これらのファイルを読みます。"), 24, colMuted)
 		})
 
 		if a.Exposure == nil {
 			a.emptyState(c, tr("Not checked yet", "尚未盤點", "未確認"),
-				tr("Read-only: the app checks existence and timestamps, never file contents. 290 paths from the public report.", "只讀：查存在與時間戳，不讀內容。公開報告 290 條路徑。", "読み取り専用：存在と時刻のみ確認し、中身は読みません。公開報告の 290 経路です。"),
+				tr("The path check reads metadata only; no file is opened. Content scanning is a separate action. 290 paths from the public report.", "路徑盤點只讀中繼資料，不開啟檔案。內容掃描是另一個動作。公開報告 290 條路徑。", "経路確認はメタデータのみで、ファイルは開きません。内容スキャンは別の操作です。公開報告の 290 経路です。"),
 				tr("Check exposure", "開始盤點", "露出確認"), a.startExposure)
 			return
 		}
@@ -70,6 +72,8 @@ func (a *App) exposurePage(c *ui.Context) {
 			a.stat(c, fmt.Sprint(len(a.Exposure.Items)-present), tr("Absent", "不在", "不在"), colMuted)
 			a.stat(c, fmt.Sprint(len(a.Exposure.Categories)), tr("Groups", "分組", "分類"), colInk)
 		})
+
+		a.secretsPanel(c)
 
 		ui.Column(c).Gap(6).Children(func() {
 			for _, cat := range a.Exposure.Categories {
@@ -142,4 +146,124 @@ func (a *App) exposureRow(c *ui.Context, it model.ExposureItem) {
 	if row.Hovered() && it.Exists {
 		row.Background(colSurface)
 	}
+}
+
+func (a *App) secretsPanel(c *ui.Context) {
+	p := panel(c)
+	p.Children(func() {
+		micro(c, tr("Leaked secrets", "洩漏的敏感資料", "漏洩した秘密情報"), colAcid)
+		mono(c, tr(
+			"Reads the files listed above. Local only; nothing is uploaded.",
+			"讀取上面列出的檔案。全程本機，不上傳。",
+			"上に並んだファイルを読みます。端末内のみ、送信しません。"), 20, colMuted)
+
+		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
+			a.actionButton(c, tr("Scan contents", "掃描內容", "内容をスキャン"), true, a.startSecretScan)
+			if a.Secrets != nil {
+				mono(c, fmt.Sprintf(tr("%d files / %d findings", "%d 個檔案 / %d 筆", "%d ファイル / %d 件"),
+					a.Secrets.FilesScanned, len(a.Secrets.Findings)), 20, colDim)
+			}
+		})
+
+		rule(c)
+
+		ui.Column(c).Gap(4).Children(func() {
+			ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
+				a.ghostButton(c, tr("Show leaked content", "顯示洩漏內容", "漏洩内容を表示"), a.startAstrLinkScan)
+				switch {
+				case a.ModelStatus.Available:
+					mono(c, tr("Model ready on disk.", "模型已在本機就緒。", "モデルは端末内にあります。"), 18, colAcid)
+				case a.ModelStatus.Note != "":
+					mono(c, clamp(a.ModelStatus.Note, 110), 18, colDim).SingleLine()
+				default:
+					mono(c, tr("Model not bundled with this build.", "此版本未附模型。", "このビルドにはモデルがありません。"), 18, colDim)
+				}
+			})
+			mono(c, tr("Directly lists the exposed sensitive data.",
+				"直接列出暴露的敏感資料。",
+				"露出した機密情報を直接一覧します。"), 18, colMuted)
+			if a.AstrLink != nil {
+				modelFindings := a.AstrLink.Findings
+				ui.Row(c).Gap(40).Children(func() {
+					a.stat(c, fmt.Sprint(len(modelFindings)), tr("Model findings", "模型找到", "モデル検出"), colWarn)
+					a.stat(c, fmt.Sprint(a.AstrLink.FilesScanned), tr("Files read", "讀取檔案", "読取ファイル"), colInk)
+				})
+				ui.Column(c).Gap(4).Children(func() {
+					for _, f := range modelFindings {
+						a.secretRow(c, f)
+					}
+				})
+			}
+		})
+
+		if a.Secrets == nil {
+			mono(c, tr("Not run yet. The check above only looked at paths.",
+				"尚未執行。上面的盤點只看路徑。",
+				"未実行。上の確認は経路だけを見ています。"), 20, colDim)
+			return
+		}
+
+		critical, high := 0, 0
+		for _, f := range a.Secrets.Findings {
+			switch f.Severity {
+			case "critical":
+				critical++
+			case "high":
+				high++
+			}
+		}
+		ui.Row(c).Gap(40).Children(func() {
+			a.stat(c, fmt.Sprint(len(a.Secrets.Findings)), tr("Secrets", "敏感資料", "秘密情報"), colDanger)
+			a.stat(c, fmt.Sprint(critical), tr("Critical", "極高", "重大"), colDanger)
+			a.stat(c, fmt.Sprint(high), tr("High", "高", "高"), colWarn)
+		})
+
+		if len(a.Secrets.Findings) == 0 {
+			mono(c, tr("No credential-shaped value was found.",
+				"沒有找到像憑證的值。",
+				"認証情報らしい値は見つかりませんでした。"), 20, colDim)
+			return
+		}
+
+		ui.TextInput(c, &a.SecretsQuery).Placeholder(tr("Filter by provider, path or value", "依供應商、路徑或值篩選", "プロバイダー・経路・値で絞込")).Grow(1).Label(tr("Filter secrets", "篩選敏感資料", "秘密情報を絞込"))
+
+		q := strings.ToLower(strings.TrimSpace(a.SecretsQuery))
+		shown := 0
+		ui.Column(c).Gap(4).Children(func() {
+			for _, f := range a.Secrets.Findings {
+				if q != "" {
+					hay := strings.ToLower(f.Provider + " " + f.Kind + " " + f.Path + " " + f.Value)
+					if !strings.Contains(hay, q) {
+						continue
+					}
+				}
+				shown++
+				a.secretRow(c, f)
+			}
+		})
+		if shown == 0 {
+			mono(c, tr("No finding matches the filter.", "沒有符合的項目。", "該当なし。"), 20, colDim)
+		}
+	})
+}
+
+func (a *App) secretRow(c *ui.Context, f model.SecretFinding) {
+	dot := severityColor(f.Severity)
+	ui.Column(c).Gap(2).Padding(8, 12).Radius(6).Children(func() {
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+			ui.Box(c).Size(10, 10).Radius(5).Background(dot)
+			mono(c, clamp(f.Provider+" / "+f.Kind, 36), 18, colInk).Width(260).SingleLine()
+			mono(c, clamp(f.Path+":"+fmt.Sprint(f.Line), 88), 18, colMuted).Grow(1).SingleLine()
+			if f.Engine == "astrlink" {
+				chip(c, "MODEL", colAcid)
+			} else {
+				chip(c, "RULE", colWarn)
+			}
+			mono(c, f.Severity, 18, dot).Width(90)
+		})
+		mono(c, f.Value, 18, colInk)
+		if action := pick3(f.Action, f.ActionZH, f.ActionJA); action != "" {
+			mono(c, action, 18, colDim)
+		}
+	})
 }

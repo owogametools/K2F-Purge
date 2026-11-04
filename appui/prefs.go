@@ -20,9 +20,12 @@ const (
 	langPrefJA
 )
 
-// langPrefs is what settings.json holds.
-type langPrefs struct {
-	Lang string `json:"lang"`
+// appPrefs is what settings.json holds. The file is additive: a build that
+// does not know a field ignores it, and an older file loads with the zero
+// value for a new one.
+type appPrefs struct {
+	Lang         string `json:"lang"`
+	LauncherPath string `json:"launcherPath,omitempty"`
 }
 
 // prefsPathOverride lets tests keep the preference away from the real user
@@ -95,27 +98,27 @@ func settingsPath() (string, error) {
 	return filepath.Join(cfg, "K2F PURGE", "settings.json"), nil
 }
 
-// loadLangPref reads the stored choice. A missing, unreadable, or invalid
-// file means auto.
-func loadLangPref() langPref {
+// readPrefs loads settings.json. A missing, unreadable, or invalid file
+// yields the zero value, so old files and no file read the same.
+func readPrefs() appPrefs {
 	path, err := settingsPath()
 	if err != nil {
-		return langPrefAuto
+		return appPrefs{}
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return langPrefAuto
+		return appPrefs{}
 	}
-	var s langPrefs
-	if err := json.Unmarshal(b, &s); err != nil {
-		return langPrefAuto
+	var p appPrefs
+	if err := json.Unmarshal(b, &p); err != nil {
+		return appPrefs{}
 	}
-	return parseLangPref(s.Lang)
+	return p
 }
 
-// saveLangPref writes the choice atomically: a temporary file in the same
+// writePrefs writes the whole file atomically: a temporary file in the same
 // directory, then a rename.
-func saveLangPref(p langPref) error {
+func writePrefs(p appPrefs) error {
 	path, err := settingsPath()
 	if err != nil {
 		return err
@@ -124,7 +127,7 @@ func saveLangPref(p langPref) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(langPrefs{Lang: p.key()}, "", "  ")
+	b, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -144,4 +147,32 @@ func saveLangPref(p langPref) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// loadLangPref reads the stored choice. A missing, unreadable, or invalid
+// file means auto.
+func loadLangPref() langPref {
+	return parseLangPref(readPrefs().Lang)
+}
+
+// loadLauncherPath reads the saved custom Launcher directory. Empty means
+// automatic discovery only.
+func loadLauncherPath() string {
+	return readPrefs().LauncherPath
+}
+
+// saveLangPref rewrites only the language field, so a saved launcher path
+// survives a language change.
+func saveLangPref(p langPref) error {
+	prefs := readPrefs()
+	prefs.Lang = p.key()
+	return writePrefs(prefs)
+}
+
+// saveLauncherPath rewrites only the launcher path field, so a saved
+// language choice survives. Empty clears the override.
+func saveLauncherPath(path string) error {
+	prefs := readPrefs()
+	prefs.LauncherPath = path
+	return writePrefs(prefs)
 }

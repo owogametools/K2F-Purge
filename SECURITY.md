@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are provided for the latest release on the 0.1.x line. Older builds are not supported.
+Security fixes are provided for the latest release on the 0.3.x line. Older builds are not supported.
 
 ## Reporting a vulnerability
 
@@ -25,7 +25,7 @@ K2F PURGE runs on a machine that may already be compromised by the NIKKE launche
 
 Assets:
 
-- the user's files and credentials (the tool must not read credential contents during exposure checks);
+- the user's files and credentials (the default exposure catalogue check must not read credential contents; the two content scans are explicit opt-in actions limited to existing catalogue entries);
 - system configuration: hosts file, firewall state, and the single HKCU registry key;
 - the integrity of the tool's own elevated operations.
 
@@ -46,7 +46,9 @@ If the operating system, the Go toolchain, or the K2F PURGE binary itself is com
 ## Controls in the code
 
 - **Read-only scan.** `internal/scan` contains no file writes or deletes. It runs `reg query` on Windows and reads files only within selected scopes. Covered by `TestRun_DoesNotWrite`.
-- **Metadata-only exposure check.** `internal/exposure/scan.go` uses `os.Lstat`, glob expansion, and `os.ReadDir`; it never calls `os.Open` or `os.ReadFile`. Covered by `TestScanWithHomeLstatOnly`.
+- **Metadata-only exposure catalogue check.** `internal/exposure/scan.go` uses `os.Lstat`, glob expansion, and `os.ReadDir`; it never calls `os.Open` or `os.ReadFile`. Covered by `TestScanWithHomeLstatOnly`. Content scans live in separate packages and are invoked by separate service methods.
+- **Explicit content scans.** `Service.SecretScan` and `Service.AstrLinkScan` run only after the user presses a button, and only when an exposure result already exists. They receive the existing file, glob, and environment-variable-pointed catalogue entries, skip directories, registry items, symlinks, binary files, and oversized files, and enforce file, finding, and byte caps. `SecretFinding.Value` is used only for the interface and for exports; logs, actions, and error messages use `SecretFinding.Masked`.
+- **Bundled model integrity.** `internal/astrlink` locates the model under the application directory, verifies each file's size and SHA-256 before use, and reports unavailability instead of downloading anything. The release scripts verify the same values before packaging.
 - **Safe evidence snippets.** Matched context is stripped of control characters and capped at 160 runes before it reaches the interface or a report (`internal/scan/search.go`).
 - **Hosts editing.** Only a marker-delimited block is written. The editor preserves unrelated content and line endings, writes atomically, and keeps a backup (`internal/block/hosts.go`).
 - **Firewall commands.** Commands run through `exec.Command` with an argv list; no shell is used. IP addresses must pass `net.ParseIP`; hostnames are validated against a restricted character set (`internal/block`).
@@ -54,7 +56,7 @@ If the operating system, the Go toolchain, or the K2F PURGE binary itself is com
 - **Quarantine first.** Files are moved into a session directory with a manifest and SHA-256, then chmodded to 0600/0700 where supported. The interface requires the typed confirmation `PURGE` before permanent deletion (`internal/clean/quarantine.go`, `appui/app.go`).
 - **Elevated operation whitelist.** `internal/elev` accepts only the names in `allowedOps`, writes the request to a random 0600 file under the user cache directory, writes the result as 0644 JSON (status and result metadata, never file contents) so the unprivileged parent can read it, checks that the op file is inside that directory, times out after 120 seconds, and deletes the request and result files (`internal/elev/elev.go`).
 - **No web engine.** The interface is native Go. There is no webview, no JavaScript runtime, and no HTML rendering surface.
-- **No network.** The application has no HTTP, TCP, UDP, or TLS client code and no telemetry or crash-reporting dependency.
+- **No network.** The application has no HTTP, TCP, UDP, or TLS client code and no telemetry or crash-reporting dependency. The AstrLink Guard model ships in the release archive; it is never downloaded at runtime.
 
 ## What the tool will never do
 
@@ -62,7 +64,8 @@ If the operating system, the Go toolchain, or the K2F PURGE binary itself is com
 - Delete the `PlatformExperienceHelper` parent folder.
 - Download detection rules, updates, payloads, or any other content.
 - Make a network request, send telemetry, or upload a crash report.
-- Read credential or wallet file contents during exposure checks.
+- Read catalogue file contents during the default exposure check. The opt-in **Scan contents** and **Show leaked content** actions read only existing catalogue entries, within the documented size, file-count, and byte caps.
+- Write complete secret values to logs or error messages. Complete values appear in the interface and in checklists or reports you explicitly save.
 - Change passwords, revoke tokens, or touch wallet funds.
 - Apply cleanup beyond the items selected in the interface.
 - Accept an arbitrary path or command from the interface, or accept an arbitrary command through the elevated-op channel.
@@ -74,5 +77,6 @@ If the operating system, the Go toolchain, or the K2F PURGE binary itself is com
 - **Non-Windows gaps.** Chrome helper DLL and Windows registry checks are skipped on Linux and macOS and are reported as scan limitations.
 - **Elevation wiring at 0.1.0.** Block operations use the whitelisted `--elevated-op` transport on Linux and macOS when the app is not root. Clean operations still call the core in-process; they can move user-owned launcher files, but privileged actions, such as Windows registry changes after a declined UAC prompt, report permission failures. Elevated children receive the op directory as `--ops-root`, because as root they cannot resolve the caller's cache directory; only a private `<...>/k2f-purge/ops` path is accepted.
 - **System tools are trusted.** The privileged paths invoke `netsh`, `reg`, `nft`, `iptables`, `systemctl`, `pfctl`, `launchctl`, and similar tools by name. Run the app from a trusted directory with a trusted `PATH`, and use OS-provided binaries.
-- **Sensitive reports.** Reports contain paths, user names, OS details, and short matched snippets. Store and share them accordingly.
+- **Sensitive reports.** Reports contain paths, user names, OS details, and short matched snippets. After an exposure content scan they also contain complete matched secret and personal-data values. Store and share them accordingly.
+- **Content scans are bounded.** They cover only existing catalogue entries, skip symlinks, binaries, and files over the caps, and can miss a secret split across lines or stored in an unsupported format. Rules can produce false positives, and the model can miss or misclassify personal data.
 - **No EDR or live protection.** The tool does not monitor processes, block execution, or detect future activity.

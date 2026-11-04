@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/owogametools/k2f-purge/internal/astrlink"
 	"github.com/owogametools/k2f-purge/internal/block"
 	"github.com/owogametools/k2f-purge/internal/clean"
 	"github.com/owogametools/k2f-purge/internal/elev"
@@ -19,6 +20,7 @@ import (
 	"github.com/owogametools/k2f-purge/internal/model"
 	"github.com/owogametools/k2f-purge/internal/report"
 	"github.com/owogametools/k2f-purge/internal/scan"
+	"github.com/owogametools/k2f-purge/internal/secrets"
 )
 
 // Service holds the engine state for one window.
@@ -135,7 +137,7 @@ func (s *Service) BlockApply(p model.BlockPlan, emit func(model.Progress)) (*mod
 	defer done()
 
 	st, verify, err := s.runBlockOp(ctx, "block.apply", p, emit, func(st *model.BlockStatus) *model.BlockVerify {
-		v := block.Verify(context.Background())
+		v := block.Verify(context.Background(), len(p.ProgramPaths) > 0)
 		st.Verified = v.AllOK
 		return &v
 	})
@@ -152,7 +154,7 @@ func (s *Service) BlockRemove(emit func(model.Progress)) (*model.BlockStatus, er
 	defer done()
 
 	st, verify, err := s.runBlockOp(ctx, "block.remove", model.BlockPlan{}, emit, func(st *model.BlockStatus) *model.BlockVerify {
-		v := block.Verify(context.Background())
+		v := block.Verify(context.Background(), false)
 		st.Verified = !v.HostsOK && !v.FirewallOK
 		return &v
 	})
@@ -229,13 +231,32 @@ func (s *Service) rememberBlock(st *model.BlockStatus, verify *model.BlockVerify
 	s.mu.Unlock()
 }
 
-// BlockVerify checks the block independently.
-func (s *Service) BlockVerify() model.BlockVerify {
-	v := block.Verify(context.Background())
+// BlockVerify checks the block independently. expectProgram also checks the
+// tbs_browser.exe program rules.
+func (s *Service) BlockVerify(expectProgram bool) model.BlockVerify {
+	v := block.Verify(context.Background(), expectProgram)
 	s.mu.Lock()
 	s.blockVerify = &v
 	s.mu.Unlock()
 	return v
+}
+
+// TBSBrowserPath resolves the launcher's embedded browser. The custom
+// Launcher directory wins; otherwise the launcher installs from the last
+// scan are tried. Both the install root and the Launcher folder are
+// accepted.
+func (s *Service) TBSBrowserPath(extraDirs []string) (string, bool) {
+	roots := append([]string(nil), extraDirs...)
+	s.mu.Lock()
+	if s.scan != nil {
+		for _, t := range s.scan.Targets {
+			if t.Kind == model.TargetLauncherInstall {
+				roots = append(roots, t.Path)
+			}
+		}
+	}
+	s.mu.Unlock()
+	return scan.FindTBSBrowser(roots)
 }
 
 // CleanPlan builds the dry run from the last scan.
@@ -304,6 +325,70 @@ func (s *Service) ExposureScan(opts model.ExposureOptions, emit func(model.Progr
 	s.actions = append(s.actions, model.Action{At: time.Now(), Kind: "exposure", Detail: "completed"})
 	s.mu.Unlock()
 	return res, nil
+}
+
+// SecretScan reads the files the exposure catalogue found and lists the
+// credentials inside them. It is a separate, explicit action: the path
+// check above never opens a file.
+func (s *Service) SecretScan(emit func(model.Progress)) (*model.SecretResult, error) {
+	s.mu.Lock()
+	exp := s.exposure
+	s.mu.Unlock()
+	if exp == nil {
+		return nil, errors.New("run the exposure check first")
+	}
+	ctx, done := s.startCancelable()
+	defer done()
+
+	res, err := secrets.Scan(ctx, exp.Items, emit)
+	if res != nil {
+		s.mu.Lock()
+		exp.Secrets = res
+		s.actions = append(s.actions, model.Action{
+			At:     time.Now(),
+			Kind:   "secrets",
+			Detail: fmt.Sprintf("content scan: %d findings", len(res.Findings)),
+		})
+		s.mu.Unlock()
+	}
+	return res, err
+}
+
+// AstrLinkStatus reports whether the bundled model is readable. It never
+// downloads anything.
+func (s *Service) AstrLinkStatus() model.AstrLinkStatus { return astrlink.Lookup() }
+
+// AstrLinkScan runs the optional local model over the same files the
+// exposure catalogue found. It needs an exposure result and a model that
+// is already on disk.
+func (s *Service) AstrLinkScan(emit func(model.Progress)) (*model.SecretResult, error) {
+	s.mu.Lock()
+	exp := s.exposure
+	s.mu.Unlock()
+	if exp == nil {
+		return nil, errors.New("run the exposure check first")
+	}
+	if st := astrlink.Lookup(); !st.Available {
+		if st.Note == "" {
+			st.Note = "model files are missing"
+		}
+		return nil, fmt.Errorf("AstrLink model unavailable: %s", st.Note)
+	}
+	ctx, done := s.startCancelable()
+	defer done()
+
+	res, err := astrlink.Scan(ctx, exp.Items, emit)
+	if res != nil {
+		s.mu.Lock()
+		exp.AstrLink = res
+		s.actions = append(s.actions, model.Action{
+			At:     time.Now(),
+			Kind:   "astrlink",
+			Detail: fmt.Sprintf("model scan: %d findings", len(res.Findings)),
+		})
+		s.mu.Unlock()
+	}
+	return res, err
 }
 
 // ExposureMarkdown is the rotation checklist.

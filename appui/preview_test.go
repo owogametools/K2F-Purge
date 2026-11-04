@@ -24,7 +24,7 @@ func TestPreview(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	svc, err := service.New("K2F PURGE", "0.2.1", "windows", "amd64", "bee")
+	svc, err := service.New("K2F PURGE", "0.3.1", "windows", "amd64", "bee")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,25 +32,42 @@ func TestPreview(t *testing.T) {
 
 	empty := &App{Info: svc.Info(), Svc: svc, CleanSel: map[string]bool{}, Started: now, ScanOpts: model.ScanOptions{MaxFileMB: 128}}
 	render(t, dir, "00-empty-scan", empty, PageScan)
+	render(t, dir, "00b-empty-verdict", empty, PageVerdict)
 
 	a := previewApp(t, svc, now)
 	for i, name := range []string{"01-scan", "02-verdict", "03-block", "04-clean", "05-exposure", "06-report"} {
 		render(t, dir, name, a, Page(i))
 	}
+	a.Secrets = nil
+	a.AstrLink = nil
+	a.Exposure.Secrets = nil
+	a.Exposure.AstrLink = nil
+	render(t, dir, "05b-exposure-no-secrets", a, PageExposure)
 }
 
 func previewApp(t *testing.T, svc *service.Service, now time.Time) *App {
 	t.Helper()
+	launcher := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(launcher, "intl_service"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(launcher, "intl_service", "tbs_browser.exe"), []byte("MZ"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	a := &App{
 		Info:         svc.Info(),
 		Svc:          svc,
 		CleanSel:     map[string]bool{"q-1": true},
 		Started:      now,
-		ScanOpts:     model.ScanOptions{MaxFileMB: 128},
+		ScanOpts:     model.ScanOptions{MaxFileMB: 128, ExtraLauncherDirs: []string{launcher}},
 		Page:         PageScan,
 		BlockPlan:    svc.BlockPlan(),
 		FindingCount: 4,
+		LauncherPath: launcher,
+		TBSExe:       filepath.Join(launcher, "intl_service", "tbs_browser.exe"),
 	}
+	a.LauncherDraft = launcher
+	a.BlockPlan.BlockTBSBrowser = true
 	a.Scan = &model.ScanResult{
 		Verdict:    model.VerdictConfirmed,
 		RulesetVer: "2026-11-04.1",
@@ -88,11 +105,14 @@ func previewApp(t *testing.T, svc *service.Service, now time.Time) *App {
 		Rules: []model.FirewallRule{
 			{Name: "K2F PURGE - Block 89.127.233.127", Installed: true},
 			{Name: "K2F PURGE - Block 89.126.250.172", Installed: true},
+			{Name: "K2F PURGE - Block tbs_browser.exe (out)", Detail: "program " + a.TBSExe, Installed: true},
+			{Name: "K2F PURGE - Block tbs_browser.exe (in)", Detail: "program " + a.TBSExe, Installed: true},
 		},
 		Persisted: true,
 		Verified:  true,
 	}
-	v := model.BlockVerify{HostsOK: true, HostsDetail: "5 names sinkholed", FirewallOK: true, AllOK: true}
+	v := model.BlockVerify{HostsOK: true, HostsDetail: "5 names sinkholed", FirewallOK: true, ProgramOK: true, AllOK: true,
+		ProgramNotes: []string{"K2F PURGE - Block tbs_browser.exe (out): present", "K2F PURGE - Block tbs_browser.exe (in): present"}}
 	a.Verify = &v
 	a.CleanPlan = &model.CleanPlan{ScanID: "scan-1", RequiresRestart: true, Items: []model.CleanItem{
 		{ID: "chrome_helper", Kind: "chrome_helper", Path: `C:\Users\bee\AppData\Local\Google\Chrome\User Data\PlatformExperienceHelper\4f1c…`, Reason: "PlatformExperienceHelper 64-hex payload", ReasonZH: "PlatformExperienceHelper 64 碼 payload", ReasonJA: "PlatformExperienceHelper 64 桁 payload", RuleID: "chrome.helper_dll", Size: 842_112},
@@ -117,6 +137,23 @@ func previewApp(t *testing.T, svc *service.Service, now time.Time) *App {
 		},
 		StartedAt: now, FinishedAt: now,
 	}
+	fakeKey := "sk" + "-" + "proj" + "-" + "Ab3x" + "Y9Ab" + "3xY9" + "Ab3x" + "Y9Ab"
+	a.Secrets = &model.SecretResult{
+		FilesScanned: 214, FilesSkipped: 23,
+		StartedAt: now, FinishedAt: now,
+		Findings: []model.SecretFinding{
+			{Engine: "rule", RuleID: "openai-project", Provider: "OpenAI", Kind: "api-key", Severity: "critical", Confidence: "confirmed", Path: `C:\Users\bee\.zshrc`, Line: 42, Column: 18, Value: fakeKey, Masked: "sk-pro…Y9Ab", Fingerprint: "a1b2c3d4e5f6", Action: "Revoke this key.", ActionZH: "撤銷這把金鑰。", ActionJA: "このキーを失効させてください。"},
+			{Engine: "rule", RuleID: "aws-access-key-id", Provider: "AWS", Kind: "access-key", Severity: "critical", Confidence: "confirmed", Path: `C:\Users\bee\.aws\credentials`, Line: 3, Column: 21, Value: "AKIA" + "AB3X" + "Y9AB" + "3XY9" + "AB3X", Masked: "AKIAAB…AB3X", Fingerprint: "f6e5d4c3b2a1", Action: "Rotate the credential.", ActionZH: "輪替憑證。", ActionJA: "認証情報をローテーションしてください。"},
+			{Engine: "astrlink", RuleID: "astrlink.common_secret", Provider: "Generic secret", Kind: "secret", Severity: "high", Confidence: "likely", Path: `C:\Users\bee\.bash_history`, Line: 108, Column: 9, Value: "Zx9" + "_Qw" + "8Lp8" + "+Rt5/", Masked: "Zx9_Qw…Rt5/", Fingerprint: "0f1e2d3c4b5a", Score: 0.97, Action: "Rotate this credential.", ActionZH: "輪替這組憑證。", ActionJA: "この認証情報をローテーションしてください。"},
+		},
+	}
+	a.Exposure.Secrets = a.Secrets
+	modelOnly := *a.Secrets
+	modelOnly.Findings = []model.SecretFinding{a.Secrets.Findings[2]}
+	a.AstrLink = &modelOnly
+	a.Exposure.AstrLink = &modelOnly
+	a.ModelStatus = model.AstrLinkStatus{Available: true, Bytes: 38 << 20}
+	a.SecretsQuery = ""
 	return a
 }
 

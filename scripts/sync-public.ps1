@@ -64,6 +64,12 @@ function Test-ShouldSkip([string]$Rel) {
     if ($n -eq 'AGENTS.md') {
         return $true
     }
+    # The AstrLink Guard model is downloaded at build time and must never
+    # land in the public companion repo (about 37 MiB of binaries).
+    if ($n -ieq 'resources/astrlink-guard' -or
+        $n.StartsWith('resources/astrlink-guard/', [StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
     # locales/catalog_gen.go is generated but tracked: the public repo's CI
     # runs `go test ./...` before any mygo build regenerates it.
     return $false

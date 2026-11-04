@@ -2,6 +2,7 @@ package appui
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -135,5 +136,76 @@ func TestSetLangPrefStillStoresUnderEnv(t *testing.T) {
 	}
 	if got := loadLangPref(); got != langPrefZH {
 		t.Fatalf("stored under env: got %v, want ZH", got)
+	}
+}
+
+func TestLauncherPathRoundTrip(t *testing.T) {
+	useTempPrefs(t)
+	if got := loadLauncherPath(); got != "" {
+		t.Fatalf("missing file: got %q, want empty", got)
+	}
+	path := filepath.Join(t.TempDir(), "NIKKE", "Launcher")
+	if err := saveLauncherPath(path); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadLauncherPath(); got != path {
+		t.Fatalf("round trip: got %q, want %q", got, path)
+	}
+	if err := saveLauncherPath(""); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadLauncherPath(); got != "" {
+		t.Fatalf("clear: got %q, want empty", got)
+	}
+}
+
+func TestPrefsFieldsDoNotEraseEachOther(t *testing.T) {
+	useTempPrefs(t)
+	path := `C:\Games\NIKKE\Launcher`
+
+	if err := saveLangPref(langPrefJA); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveLauncherPath(path); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadLangPref(); got != langPrefJA {
+		t.Fatalf("language lost after saving the path: %v", got)
+	}
+	if got := loadLauncherPath(); got != path {
+		t.Fatalf("path lost: %q", got)
+	}
+
+	// A later language change must keep the path.
+	if err := saveLangPref(langPrefZH); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadLauncherPath(); got != path {
+		t.Fatalf("language change wiped the path: %q", got)
+	}
+
+	// Clearing the path must keep the language.
+	if err := saveLauncherPath(""); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadLangPref(); got != langPrefZH {
+		t.Fatalf("path clear wiped the language: %v", got)
+	}
+}
+
+func TestPrefsInvalidFileIsEmpty(t *testing.T) {
+	useTempPrefs(t)
+	path, err := settingsPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadLauncherPath(); got != "" {
+		t.Fatalf("invalid file: got %q, want empty", got)
+	}
+	if got := loadLangPref(); got != langPrefAuto {
+		t.Fatalf("invalid file: got %v, want auto", got)
 	}
 }

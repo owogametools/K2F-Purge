@@ -23,15 +23,19 @@ var categoryTitle = map[string]string{
 	"system":        "系統",
 }
 
-// ExportMarkdown renders a rotation checklist grouped by category.
-// It lists paths and existence only; it never includes file contents.
+// ExportMarkdown renders a rotation checklist grouped by category. The
+// path list carries existence metadata only; when the user ran a content
+// scan, its sections include the full secret values on purpose.
 func ExportMarkdown(r *model.ExposureResult) string {
 	if r == nil {
 		return "# 曝險輪替清單\n\n（無資料）\n"
 	}
 	var b strings.Builder
 	b.WriteString("# 曝險輪替清單\n\n")
-	b.WriteString("本清單只記錄路徑是否存在。K2F PURGE 沒有讀取任何檔案內容，也不是防毒軟體。\n\n")
+	b.WriteString("路徑盤點只記錄是否存在。若你另外執行了內容掃描，下方會列出找到的敏感資料，**包含完整值**；請把這份檔案當作機密資料處理。K2F PURGE 不是防毒軟體。\n\n")
+	if r.Secrets != nil || r.AstrLink != nil {
+		b.WriteString("> 警告：本檔含完整 secret。不要上傳、貼到聊天室或放進共用的雲端資料夾。\n\n")
+	}
 	if !r.StartedAt.IsZero() || !r.FinishedAt.IsZero() {
 		fmt.Fprintf(&b, "掃描時間：%s → %s\n\n", fmtTime(r.StartedAt), fmtTime(r.FinishedAt))
 	}
@@ -105,6 +109,9 @@ func ExportMarkdown(r *model.ExposureResult) string {
 		}
 	}
 
+	WriteSecretSection(&b, "洩漏的敏感資料（規則）", r.Secrets)
+	WriteSecretSection(&b, "洩漏的敏感資料（模型）", r.AstrLink)
+
 	if len(r.Limitations) > 0 {
 		b.WriteString("\n## 限制\n\n")
 		for _, lim := range r.Limitations {
@@ -112,6 +119,33 @@ func ExportMarkdown(r *model.ExposureResult) string {
 		}
 	}
 	return b.String()
+}
+
+// WriteSecretSection renders one content-scan result. The value is
+// printed in full on purpose: the user chose to export it so the key can
+// be rotated.
+func WriteSecretSection(b *strings.Builder, title string, r *model.SecretResult) {
+	if r == nil {
+		return
+	}
+	fmt.Fprintf(b, "\n## %s\n\n", title)
+	b.WriteString("> 警告：以下含完整 secret 值，請把這份檔案當作機密資料處理。\n\n")
+	fmt.Fprintf(b, "掃描 %d 個檔案，找到 %d 筆。\n\n", r.FilesScanned, len(r.Findings))
+	if len(r.Findings) == 0 {
+		b.WriteString("沒有找到。\n")
+		return
+	}
+	for _, f := range r.Findings {
+		fmt.Fprintf(b, "- [ ] %s / %s — `%s:%d`（%s）\n", f.Provider, f.Kind, f.Path, f.Line, f.Severity)
+		fmt.Fprintf(b, "  值：`%s`\n", f.Value)
+		action := f.Action
+		if f.ActionZH != "" {
+			action = f.ActionZH
+		}
+		if action != "" {
+			fmt.Fprintf(b, "  建議：%s\n", action)
+		}
+	}
 }
 
 func fmtTime(t time.Time) string {

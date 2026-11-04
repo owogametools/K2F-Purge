@@ -67,6 +67,9 @@ func Apply(ctx context.Context, p model.BlockPlan, emit func(model.Progress)) (*
 	if p.FlushDNS {
 		total++
 	}
+	if len(p.ProgramPaths) > 0 {
+		total++
+	}
 	done := 0
 
 	if p.UseHosts {
@@ -106,6 +109,19 @@ func Apply(ctx context.Context, p model.BlockPlan, emit func(model.Progress)) (*
 		return st, err
 	}
 
+	if len(p.ProgramPaths) > 0 {
+		progress(emit, done, total, "program-firewall")
+		rules, warns, fails := applyProgramFirewall(ctx, p.ProgramPaths)
+		st.Rules = append(st.Rules, rules...)
+		st.Warnings = append(st.Warnings, warns...)
+		st.Failures = append(st.Failures, fails...)
+		done++
+	}
+	if err := ctx.Err(); err != nil {
+		st.Failures = append(st.Failures, err.Error())
+		return st, err
+	}
+
 	if p.FlushDNS {
 		progress(emit, done, total, "flush-dns")
 		if err := flushDNS(ctx); err != nil {
@@ -114,7 +130,7 @@ func Apply(ctx context.Context, p model.BlockPlan, emit func(model.Progress)) (*
 		done++
 	}
 
-	v := Verify(ctx)
+	v := Verify(ctx, len(p.ProgramPaths) > 0)
 	st.Verified = v.AllOK
 	if !v.AllOK && v.HostsDetail != "" {
 		st.Warnings = append(st.Warnings, "verify hosts: "+v.HostsDetail)
@@ -129,28 +145,33 @@ func Remove(ctx context.Context, emit func(model.Progress)) (*model.BlockStatus,
 		ctx = context.Background()
 	}
 	st := &model.BlockStatus{HostsPath: hostsPath()}
-	progress(emit, 0, 2, "hosts")
+	progress(emit, 0, 3, "hosts")
 	if err := removeHosts(); err != nil {
 		st.Failures = append(st.Failures, "hosts: "+err.Error())
 	} else {
 		st.HostsApplied = false
 	}
-	progress(emit, 1, 2, "firewall")
+	progress(emit, 1, 3, "firewall")
 	warns, fails := removeFirewall(ctx)
 	st.Warnings = append(st.Warnings, warns...)
 	st.Failures = append(st.Failures, fails...)
-	v := Verify(ctx)
+	progress(emit, 2, 3, "program-firewall")
+	warns, fails = removeProgramFirewall(ctx)
+	st.Warnings = append(st.Warnings, warns...)
+	st.Failures = append(st.Failures, fails...)
+	v := Verify(ctx, false)
 	st.Verified = !v.HostsOK && !v.FirewallOK
 	st.Rules = nil
 	st.Persisted = false
-	progress(emit, 2, 2, "done")
+	progress(emit, 3, 3, "done")
 	return st, nil
 }
 
 // Verify checks the hosts marker and the named firewall rules. It does
 // not query the network: a LookupHost of an unblocked name would leak
-// DNS, which this tool must never do.
-func Verify(ctx context.Context) model.BlockVerify {
+// DNS, which this tool must never do. When expectProgram is true it also
+// checks the two tbs_browser.exe program rules.
+func Verify(ctx context.Context, expectProgram bool) model.BlockVerify {
 	v := model.BlockVerify{}
 	ok, detail := verifyHostsFile(defaultDomains)
 	v.HostsOK = ok
@@ -160,6 +181,13 @@ func Verify(ctx context.Context) model.BlockVerify {
 	v.FirewallOK = fwOK
 	v.FirewallNotes = notes
 	v.AllOK = v.HostsOK && v.FirewallOK
+
+	if expectProgram {
+		progOK, progNotes := verifyProgramFirewall(ctx)
+		v.ProgramOK = progOK
+		v.ProgramNotes = progNotes
+		v.AllOK = v.AllOK && progOK
+	}
 	return v
 }
 
@@ -242,6 +270,14 @@ func validHostname(d string) bool {
 func ruleName(ip string) string {
 	return "K2F PURGE - Block " + ip
 }
+
+// Fixed names for the opt-in tbs_browser.exe program rules. Removal and
+// verification look them up by name, so they work without the exe path
+// and survive an app restart.
+const (
+	tbsRuleOut = "K2F PURGE - Block tbs_browser.exe (out)"
+	tbsRuleIn  = "K2F PURGE - Block tbs_browser.exe (in)"
+)
 
 func refuseRealFirewall() error {
 	if testing.Testing() && !usingTestRunner {

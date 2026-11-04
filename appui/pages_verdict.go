@@ -10,6 +10,8 @@ import (
 )
 
 func (a *App) verdictPage(c *ui.Context) {
+	a.launcherPanel(c)
+
 	if a.Scan == nil {
 		a.emptyState(c, tr("No scan yet", "尚未掃描", "未走査"), tr("Run a scan to produce a verdict.", "先跑掃描才有判定。", "走査すると判定が出ます。"), tr("Go to scan", "去掃描", "走査へ"), func() { a.Page = PageScan })
 		return
@@ -76,6 +78,39 @@ func (a *App) verdictPage(c *ui.Context) {
 			a.ghostButton(c, tr("Exposure check", "曝險盤點", "露出確認"), func() { a.Page = PageExposure })
 			a.ghostButton(c, tr("Report", "報告", "報告"), func() { a.Page = PageReport })
 		})
+	})
+}
+
+// launcherPanel lets the user point discovery at a launcher folder when the
+// automatic search misses it. It renders on the empty verdict too, because an
+// INCONCLUSIVE scan is exactly what this feature fixes.
+func (a *App) launcherPanel(c *ui.Context) {
+	p := panel(c)
+	p.Children(func() {
+		micro(c, tr("Launcher location", "啟動器位置", "ランチャーの場所"), colDim)
+		ui.Text(c, tr("Automatic discovery misses some installs. Point the scan at the NIKKE launcher folder to include it.", "自動探索可能漏掉某些安裝。指定 NIKKE 啟動器資料夾，掃描就會納入。", "自動検出で見つからない場合、NIKKE ランチャーのフォルダを指定してください。")).
+			FontSize(22).TextColor(colMuted)
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+			ui.TextInput(c, &a.LauncherDraft).
+				Placeholder(tr("Absolute folder path", "資料夾絕對路徑", "フォルダの絶対パス")).
+				Grow(1).Label(tr("Launcher folder", "啟動器資料夾", "ランチャーフォルダ"))
+			a.ghostButton(c, tr("Browse", "瀏覽", "参照"), a.browseLauncherPath)
+			a.actionButton(c, tr("Save and rescan", "儲存並重掃", "保存して再走査"), true, a.saveLauncherPathAndScan)
+			if a.LauncherPath != "" {
+				a.ghostButton(c, tr("Clear", "清除", "クリア"), a.clearLauncherPath)
+			}
+		})
+		if a.LauncherErr != "" {
+			mono(c, a.LauncherErr, 20, colDanger).SingleLine()
+		}
+		switch {
+		case a.LauncherPath == "":
+			mono(c, tr("Discovery is automatic.", "目前自動探索。", "現在は自動検出です。"), 20, colDim).SingleLine()
+		case a.launcherExists():
+			mono(c, trf("Saved: %s · folder exists", "已儲存：%s · 資料夾存在", "保存済み：%s · フォルダあり", a.LauncherPath), 20, colAcid).SingleLine()
+		default:
+			mono(c, trf("Saved: %s · folder missing", "已儲存：%s · 資料夾不存在", "保存済み：%s · フォルダなし", a.LauncherPath), 20, colWarn).SingleLine()
+		}
 	})
 }
 

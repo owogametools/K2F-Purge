@@ -34,10 +34,12 @@ The standalone incident report is [docs/incident-report.zh-Hant.md](docs/inciden
 | **VERDICT** | Rolls findings into `CONFIRMED`, `LIKELY`, `INCONCLUSIVE`, or `CLEAR_OF_LISTED_IOCS`, with the scan's limits shown next to the result. | None |
 | **BLOCK** | Pins `insightjs.com`, `www.insightjs.com`, `analytics.insightjs.com`, `insightjs.org`, and `www.insightjs.org` in the hosts file, and drops `89.127.233.127` and `89.126.250.172` outbound. Windows uses named `netsh` rules. Linux uses an `nftables` table plus a systemd unit, with an iptables fallback. macOS uses a `pf` anchor plus a LaunchDaemon. Apply verifies the result. Remove deletes only this tool's marker block and its own rules, anchors, and persistence files. | Hosts marker and backup; firewall rules |
 | **CLEAN** | Builds a dry-run plan from the last scan. The default action is quarantine under `<user config dir>/K2F PURGE/quarantine/<timestamp>/`, with `manifest.json` and SHA-256-named copies. Items are selectable. Restore and purge are available from the quarantine list. Permanent deletion requires typing `PURGE`. Registry work is limited to the single `HKCU` CLSID, with a `.reg` export first; `HKLM` is refused. Locked DLLs are copied or scheduled for deletion at reboot with `MoveFileExW`. | Moves files to quarantine; deletes the selected `HKCU` key |
-| **EXPOSURE** | Checks a 290-entry catalog derived from the public `target-paths.md`: environment variables, SSH/GPG, browser profiles, cloud CLIs, AI tools, dev tools, shell history, wallets, and project folders. Reports present/absent, size, and mtime only. It never reads file contents. Exports a Markdown rotation checklist (Traditional Chinese). | None, apart from the checklist you choose to save |
+| **EXPOSURE** | Checks a 290-entry catalog derived from the public `target-paths.md`: environment variables, SSH/GPG, browser profiles, cloud CLIs, AI tools, dev tools, shell history, wallets, and project folders. The default check is metadata-only: `Lstat`, glob expansion, and directory enumeration report present/absent, size, and mtime without opening files. Two explicit opt-in actions read the catalogue files that exist: **Scan contents** applies API-key/secret rules with full values shown; **Show leaked content** runs the bundled AstrLink Guard model and lists secrets and personal data with full values shown. Both skip symlinks, binaries, and oversized files and enforce file/finding/byte caps. Local only. Exports a Markdown rotation checklist (Traditional Chinese). | None, apart from the checklist or report you choose to save |
 | **REPORT** | Writes a local Markdown report (Traditional Chinese) and a machine-readable JSON report with findings, actions, block state, clean results, exposure summary, and limitations. | Files in the directory you choose |
 
 The scanner only reads within its known roots. It does not walk the whole disk, and it enforces a per-file size cap (128 MB by default) and a per-scope file cap. Windows-only checks (Chrome helper DLL and registry) are skipped on other platforms and listed in the scan limitations. The embedded ruleset is version `2026-11-04.1`, compiled in from `internal/ioc/rules.json`.
+
+The two exposure content actions never start on their own. **Scan contents** reads only existing `file`, glob-expanded, and environment-variable-pointed entries from the 290-entry catalogue (not directories or registry keys), skips symlinks, binary files, a binary extension list, and files over 8 MiB, and stops at 4,096 files, 2,000 findings, or 64 MiB read. **Show leaked content** runs the bundled int8 model over the same file list with tighter limits (256 KiB per file, 8 MiB total, 512 windows). Complete secret values appear in the interface and in a checklist or report you save; application logs and error messages contain masked values only. The model is included in release archives (about 37 MiB) and is never downloaded at runtime; if it is missing, the button reports the reason and runs nothing.
 
 ## Safety model
 
@@ -49,7 +51,8 @@ It will not:
 - delete the `PlatformExperienceHelper` parent folder (only a 64-hex child containing `platform_experience_helper.dll`);
 - accept an arbitrary path from the interface: cleanup paths are derived by the app and re-checked against an allowlist, with symlink-escape checks;
 - run a shell, interpolate a command string, or accept arbitrary commands through the elevated-op channel;
-- read credential or wallet file contents during exposure checks;
+- read catalogue file contents during the default exposure check; the opt-in **Scan contents** and **Show leaked content** actions read only existing catalogue entries and skip symlinks, binaries, and files over the size limits;
+- write full secret values to a log or error message; full values appear in the interface and in the checklist or report you explicitly save;
 - download rules, updates, or anything else, and it has no telemetry, crash reporting, or auto-update;
 - change passwords, revoke tokens, or move wallet funds;
 - act on cleanup items you did not select.
@@ -64,7 +67,7 @@ The footer carries a `NOT AN ANTIVIRUS · NO NETWORK` notice (translated when th
 
 ## Download
 
-Release builds are attached to [GitHub Releases](https://github.com/owogametools/K2F-Purge/releases). The source and release repository is public at [owogametools/K2F-Purge](https://github.com/owogametools/K2F-Purge). Building from source is the most direct way to verify a binary.
+Release builds are attached to [GitHub Releases](https://github.com/owogametools/K2F-Purge/releases). Release archives include the verified AstrLink Guard model files next to the binary; nothing is downloaded at application runtime. The source and release repository is public at [owogametools/K2F-Purge](https://github.com/owogametools/K2F-Purge). Building from source is the most direct way to verify a binary.
 
 ## Build
 
@@ -72,13 +75,16 @@ Requirements: Go 1.27.3. The `tool` directive in `go.mod` pins the mygo build to
 
 ```sh
 go test ./...
+sh scripts/fetch-astrlink.sh   # Linux/macOS; on Windows: pwsh -File scripts/fetch-astrlink.ps1
 go tool mygo build
 ```
+
+The fetch step is needed for release packaging. It downloads the three model files into `resources/astrlink-guard/7216b6a3b897/`, verifies size and SHA-256, and skips files that are already valid. `mygo build` copies `resources/` next to the exe and into the NSIS installer. Without the model the app still builds, but **Show leaked content** reports that the model is unavailable.
 
 On Windows this writes:
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.2.1-amd64.exe` (NSIS installer)
+- `build/windows-amd64/k2f-purge-setup-0.3.1-amd64.exe` (NSIS installer)
 
 Cross-compilation:
 
@@ -89,7 +95,7 @@ go tool mygo build -platform darwin/universal
 
 A signed macOS `.app`/`.dmg` must be produced on macOS. Running the mygo tool for Linux also produces a tarball, Debian package, and PKGBUILD. If NSIS is not installed on Windows, the mygo build tool downloads it; that is a build-time step, not application behavior.
 
-On Windows at the 0.2.1 release, `go test ./...` reports 110 passing tests across 12 packages. `GOOS=linux go build ./...` and `GOOS=darwin go build ./...` also complete.
+At the 0.3.1 release, `go test ./...` passes on Windows. `GOOS=linux go build ./...` and `GOOS=darwin go build ./...` also complete.
 
 ## Verify it yourself
 
@@ -97,3 +103,4 @@ Step-by-step checks - ruleset comparison, tests, network-import grep, block-plan
 
 - [PRIVACY.md](PRIVACY.md): what is written to disk and where.
 - [SECURITY.md](SECURITY.md): threat model, non-goals, and vulnerability reporting.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): magpie (MIT) and AstrLink Guard model (Apache-2.0) notices.

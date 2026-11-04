@@ -110,7 +110,8 @@ set -- \
   --exclude '*.exe' \
   --exclude '.DS_Store' \
   --exclude 'Thumbs.db' \
-  --exclude '/AGENTS.md'
+  --exclude '/AGENTS.md' \
+  --exclude '/resources/astrlink-guard/'
 
 if [ "$dry_run" -eq 1 ]; then
   set -- -n --out-format='%n' "$@"

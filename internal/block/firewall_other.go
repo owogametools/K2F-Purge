@@ -24,3 +24,16 @@ func verifyFirewall(ctx context.Context, ips []string) (bool, []string) {
 func flushDNS(ctx context.Context) error {
 	return fmt.Errorf("flush DNS: unsupported OS")
 }
+
+// Program blocking is Windows-only; the interface never offers it here.
+func applyProgramFirewall(ctx context.Context, programs []string) ([]model.FirewallRule, []string, []string) {
+	return nil, nil, []string{"tbs_browser.exe blocking is supported on Windows only"}
+}
+
+func removeProgramFirewall(ctx context.Context) ([]string, []string) {
+	return nil, nil
+}
+
+func verifyProgramFirewall(ctx context.Context) (bool, []string) {
+	return false, []string{"tbs_browser.exe blocking is supported on Windows only"}
+}

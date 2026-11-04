@@ -307,6 +307,35 @@ func isLauncherInstall(path string) bool {
 	return false
 }
 
+// FindTBSBrowser returns the first existing
+// <root>\intl_service\tbs_browser.exe or
+// <root>\Launcher\intl_service\tbs_browser.exe. A root may be either the
+// install folder or the Launcher folder itself. It only stats, never walks.
+func FindTBSBrowser(roots []string) (string, bool) {
+	seen := map[string]struct{}{}
+	for _, root := range roots {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
+		}
+		root = filepath.Clean(root)
+		key := strings.ToLower(filepath.ToSlash(root))
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		for _, rel := range []string{
+			filepath.Join(root, "intl_service", "tbs_browser.exe"),
+			filepath.Join(root, "Launcher", "intl_service", "tbs_browser.exe"),
+		} {
+			if st, err := os.Lstat(rel); err == nil && st.Mode().IsRegular() {
+				return rel, true
+			}
+		}
+	}
+	return "", false
+}
+
 func isWinePrefix(path string) bool {
 	if st, err := os.Lstat(filepath.Join(path, "drive_c")); err == nil && st.IsDir() {
 		return true

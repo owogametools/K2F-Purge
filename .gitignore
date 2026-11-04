@@ -1,5 +1,6 @@
 # Build outputs
 /build/
+/appui/build/
 /.mygo/
 /dist/
 /quarantine/
@@ -13,3 +14,6 @@ Thumbs.db
 /.claude/settings.local.json
 /.claude/worktrees/
 /.trellis/.runtime/
+
+# Release model, downloaded by scripts/fetch-astrlink.*
+/resources/astrlink-guard/

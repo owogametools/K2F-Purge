@@ -3,6 +3,8 @@
 package appui
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -47,7 +49,10 @@ type App struct {
 
 	Page Page
 	Err  string
-	Lang langPref
+	// Notice is a neutral outcome, such as a cancelled scan. It is not an
+	// error and is cleared when the next action starts.
+	Notice string
+	Lang   langPref
 
 	LogScroll ui.ScrollState
 	logSeen   int
@@ -61,6 +66,14 @@ type App struct {
 	Scan         *model.ScanResult
 	Targets      []model.ScanTarget
 	FindingCount int
+
+	LauncherPath  string // saved and validated, also in ScanOpts.ExtraLauncherDirs
+	LauncherDraft string // text field binding
+	LauncherErr   string // inline validation message
+	TBSExe        string // last resolved tbs_browser.exe, display cache
+
+	StageScroll ui.ScrollState // the page body scroll
+	scrollPage  Page           // which page StageScroll belongs to
 
 	BlockPlan model.BlockPlan
 	Block     *model.BlockStatus
@@ -78,13 +91,18 @@ type App struct {
 	ExposureQuery string
 	OnlyPresent   bool
 
+	Secrets      *model.SecretResult
+	AstrLink     *model.SecretResult
+	SecretsQuery string
+	ModelStatus  model.AstrLinkStatus
+
 	ReportPath string
 	Started    time.Time
 }
 
 // New makes the app's state.
 func New(info model.AppInfo, svc *service.Service) *App {
-	return &App{
+	a := &App{
 		Info:      info,
 		Svc:       svc,
 		Page:      PageScan,
@@ -94,6 +112,13 @@ func New(info model.AppInfo, svc *service.Service) *App {
 		Started:   time.Now(),
 		ScanOpts:  model.ScanOptions{MaxFileMB: 128},
 	}
+	a.ModelStatus = svc.AstrLinkStatus()
+	a.LauncherPath = loadLauncherPath()
+	a.LauncherDraft = a.LauncherPath
+	if a.LauncherPath != "" {
+		a.ScanOpts.ExtraLauncherDirs = []string{a.LauncherPath}
+	}
+	return a
 }
 
 // Attach gives the app the window its view is shown in.
@@ -150,6 +175,9 @@ func (a *App) stage(c *ui.Context) {
 				if a.Progress.Total > 0 {
 					mono(c, fmt.Sprintf("%d / %d", a.Progress.Done, a.Progress.Total), 22, colMuted)
 				}
+				if a.Progress.SubTotal > 0 {
+					mono(c, fmt.Sprintf("%d / %d", a.Progress.SubDone, a.Progress.SubTotal), 22, colMuted)
+				}
 				if a.Progress.Current != "" {
 					mono(c, clamp(a.Progress.Current, 72), 22, colMuted)
 				}
@@ -165,7 +193,19 @@ func (a *App) stage(c *ui.Context) {
 				a.ghostButton(c, tr("Dismiss", "關閉", "閉じる"), func() { a.Err = "" })
 			})
 		}
-		ui.Scroll(c).Grow(1).Fill().Children(func() {
+		if a.Notice != "" {
+			ui.Row(c).Padding(20, 40).Gap(12).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, a.Notice).FontSize(26).TextColor(colMuted).Grow(1)
+				a.ghostButton(c, tr("Dismiss", "關閉", "閉じる"), func() { a.Notice = "" })
+			})
+		}
+		// A page change starts at the top and also cancels a pending jump to
+		// the result from the page we just left.
+		if a.Page != a.scrollPage {
+			a.scrollPage = a.Page
+			a.StageScroll.ScrollTo(0, 0, ui.Snappy)
+		}
+		ui.Scroll(c).Grow(1).Fill().TrackScroll(&a.StageScroll).Children(func() {
 			ui.Column(c).Padding(40, 52).Gap(32).Children(func() {
 				switch a.Page {
 				case PageScan:
@@ -203,6 +243,7 @@ func (a *App) startScan() {
 	a.Busy = true
 	a.BusyLabel = tr("Scanning", "掃描中", "走査中")
 	a.Err = ""
+	a.Notice = ""
 	a.ScanLog = nil
 	a.logSeen = 0
 	a.LogScroll.Y = math.MaxFloat32
@@ -266,6 +307,20 @@ func (a *App) startBlock(remove bool) {
 	if a.Busy || a.Win == nil {
 		return
 	}
+	a.Notice = ""
+	if !remove {
+		if a.BlockPlan.BlockTBSBrowser {
+			exe, ok := a.Svc.TBSBrowserPath(a.ScanOpts.ExtraLauncherDirs)
+			if !ok {
+				a.Err = tr("tbs_browser.exe was not found. Set the launcher folder on the verdict page, then try again.", "找不到 tbs_browser.exe。請先在判定頁設定啟動器資料夾。", "tbs_browser.exe が見つかりません。判定ページでランチャーのフォルダを設定してください。")
+				return
+			}
+			a.TBSExe = exe
+			a.BlockPlan.ProgramPaths = []string{exe}
+		} else {
+			a.BlockPlan.ProgramPaths = nil
+		}
+	}
 	a.Busy = true
 	a.Err = ""
 	a.BusyLabel = tr("Blocking", "封鎖中", "遮断中")
@@ -290,8 +345,14 @@ func (a *App) startBlock(remove bool) {
 				a.Err = err.Error()
 			}
 			a.Block = st
-			v := a.Svc.BlockVerify()
+			expectProgram := !remove && len(a.BlockPlan.ProgramPaths) > 0
+			v := a.Svc.BlockVerify(expectProgram)
 			a.Verify = &v
+			// Show the outcome once: the result and the next action live at
+			// the end of the page.
+			if !remove && a.Page == PageBlock {
+				a.StageScroll.ScrollTo(0, math.MaxFloat32, ui.Snappy)
+			}
 		})
 	}()
 }
@@ -300,6 +361,7 @@ func (a *App) startClean() {
 	if a.Busy || a.Win == nil || a.CleanPlan == nil {
 		return
 	}
+	a.Notice = ""
 	mode := model.CleanQuarantine
 	if a.CleanMode == 1 {
 		if !strings.EqualFold(strings.TrimSpace(a.Confirm), "PURGE") {
@@ -343,10 +405,88 @@ func (a *App) startClean() {
 	}()
 }
 
+func (a *App) startSecretScan() {
+	if a.Busy || a.Win == nil {
+		return
+	}
+	a.Notice = ""
+	if a.Exposure == nil {
+		a.Err = tr("run the exposure check first", "請先做曝險盤點", "先に露出確認をしてください")
+		return
+	}
+	a.Busy = true
+	a.BusyLabel = tr("Reading files", "讀取檔案中", "ファイル読み取り中")
+	a.Err = ""
+	go func() {
+		res, err := a.Svc.SecretScan(func(p model.Progress) {
+			a.onMain(func() { a.Progress = p })
+		})
+		a.onMain(func() {
+			a.Busy = false
+			a.Progress = model.Progress{}
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					a.Notice = tr("Scan cancelled", "已取消", "中止しました")
+					a.Secrets = res
+					return
+				}
+				a.Err = err.Error()
+				return
+			}
+			a.Secrets = res
+		})
+	}()
+}
+
+func (a *App) startAstrLinkScan() {
+	if a.Busy || a.Win == nil {
+		return
+	}
+	a.Notice = ""
+	if a.Exposure == nil {
+		a.Err = tr("run the exposure check first", "請先做曝險盤點", "先に露出確認をしてください")
+		return
+	}
+	st := a.Svc.AstrLinkStatus()
+	a.ModelStatus = st
+	if !st.Available {
+		if st.Note == "" {
+			st.Note = tr("AstrLink model is not available in this build.",
+				"此版本沒有可用的 AstrLink 模型。",
+				"このビルドには AstrLink モデルがありません。")
+		}
+		a.Err = st.Note
+		return
+	}
+	a.Busy = true
+	a.BusyLabel = tr("Reading with the local model", "本地模型讀取中", "ローカルモデルで読み取り中")
+	a.Err = ""
+	go func() {
+		res, err := a.Svc.AstrLinkScan(func(p model.Progress) {
+			a.onMain(func() { a.Progress = p })
+		})
+		a.onMain(func() {
+			a.Busy = false
+			a.Progress = model.Progress{}
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					a.Notice = tr("Scan cancelled", "已取消", "中止しました")
+					a.AstrLink = res
+					return
+				}
+				a.Err = err.Error()
+				return
+			}
+			a.AstrLink = res
+		})
+	}()
+}
+
 func (a *App) startExposure() {
 	if a.Busy || a.Win == nil {
 		return
 	}
+	a.Notice = ""
 	a.Busy = true
 	a.BusyLabel = tr("Checking exposure", "盤點中", "確認中")
 	a.Err = ""
@@ -362,6 +502,12 @@ func (a *App) startExposure() {
 				return
 			}
 			a.Exposure = res
+			// The content scans belong to the previous path result. Drop
+			// them so the panel never shows findings for files the new
+			// catalogue run no longer lists.
+			a.Secrets = nil
+			a.AstrLink = nil
+			a.SecretsQuery = ""
 		})
 	}()
 }
@@ -462,6 +608,93 @@ func (a *App) selectedQuarantine() []string {
 		}
 	}
 	return ids
+}
+
+// validateLauncherDir accepts an absolute, existing directory and returns it
+// cleaned. The interface never hands an unchecked path to the scanner.
+func validateLauncherDir(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("%s", tr("Enter a launcher folder.", "請輸入啟動器資料夾。", "ランチャーのフォルダを入力してください。"))
+	}
+	if !filepath.IsAbs(raw) {
+		return "", fmt.Errorf("%s", tr("Use an absolute path.", "請使用絕對路徑。", "絶対パスを使ってください。"))
+	}
+	cleaned := filepath.Clean(raw)
+	st, err := os.Stat(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("%s", tr("That path does not exist.", "路徑不存在。", "そのパスは存在しません。"))
+	}
+	if !st.IsDir() {
+		return "", fmt.Errorf("%s", tr("That path is not a folder.", "路徑不是資料夾。", "そのパスはフォルダではありません。"))
+	}
+	return cleaned, nil
+}
+
+// launcherExists reports whether the saved path still exists, for the status
+// line on the verdict page.
+func (a *App) launcherExists() bool {
+	if a.LauncherPath == "" {
+		return false
+	}
+	st, err := os.Stat(a.LauncherPath)
+	return err == nil && st.IsDir()
+}
+
+// browseLauncherPath opens the native directory picker and puts the choice in
+// the draft. The user still saves, so browsing never changes the setting by
+// itself.
+func (a *App) browseLauncherPath() {
+	if a.Win == nil {
+		return
+	}
+	start := strings.TrimSpace(a.LauncherDraft)
+	if start == "" {
+		start = a.LauncherPath
+	}
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+		Parent:      a.Win,
+		Title:       tr("Choose the NIKKE launcher folder", "選擇 NIKKE 啟動器資料夾", "NIKKE ランチャーのフォルダを選択"),
+		DefaultPath: start,
+		Directory:   true,
+	})
+	if err != nil || len(paths) == 0 {
+		return
+	}
+	a.LauncherDraft = paths[0]
+	a.LauncherErr = ""
+}
+
+// saveLauncherPathAndScan persists a validated path, updates the scan options,
+// and starts a fresh scan so the verdict reflects the new location.
+func (a *App) saveLauncherPathAndScan() {
+	cleaned, err := validateLauncherDir(a.LauncherDraft)
+	if err != nil {
+		a.LauncherErr = err.Error()
+		return
+	}
+	if err := saveLauncherPath(cleaned); err != nil {
+		a.LauncherErr = err.Error()
+		return
+	}
+	a.LauncherErr = ""
+	a.LauncherPath = cleaned
+	a.LauncherDraft = cleaned
+	a.ScanOpts.ExtraLauncherDirs = []string{cleaned}
+	a.startScan()
+}
+
+// clearLauncherPath removes the override and returns discovery to automatic
+// only. It does not scan on its own.
+func (a *App) clearLauncherPath() {
+	if err := saveLauncherPath(""); err != nil {
+		a.LauncherErr = err.Error()
+		return
+	}
+	a.LauncherErr = ""
+	a.LauncherPath = ""
+	a.LauncherDraft = ""
+	a.ScanOpts.ExtraLauncherDirs = nil
 }
 
 func clamp(s string, n int) string {

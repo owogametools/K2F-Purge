@@ -85,6 +85,11 @@ type Progress struct {
 	Done    int
 	Total   int
 	Current string
+	// SubDone and SubTotal report work inside Current, such as the windows
+	// of a file read by the local model. Zero means the action has no
+	// sub-progress and the interface hides it.
+	SubDone  int
+	SubTotal int
 }
 
 // ScanEvent is emitted while a scan runs.
@@ -125,6 +130,13 @@ type BlockPlan struct {
 	UseFirewall bool
 	Persist     bool
 	FlushDNS    bool
+
+	// BlockTBSBrowser is the opt-in program block for the launcher's
+	// embedded browser. ProgramPaths holds the absolute exe paths the
+	// interface resolved before applying; it is never filled with a
+	// default exe by the engine.
+	BlockTBSBrowser bool
+	ProgramPaths    []string
 }
 
 // FirewallRule is one rule the app owns.
@@ -151,6 +163,8 @@ type BlockVerify struct {
 	HostsDetail   string
 	FirewallOK    bool
 	FirewallNotes []string
+	ProgramOK     bool
+	ProgramNotes  []string
 	AllOK         bool
 }
 
@@ -253,6 +267,54 @@ type ExposureResult struct {
 	StartedAt   time.Time
 	FinishedAt  time.Time
 	Limitations []string
+
+	// Secrets is the rule-based content scan. AstrLink is the optional
+	// local-model scan. Both are nil until the user asks for them: the
+	// path check above never opens a file.
+	Secrets  *SecretResult
+	AstrLink *SecretResult
+}
+
+// SecretFinding is one secret or piece of personal data found in a file.
+// Value holds the full text on purpose: the interface and the exported
+// checklist show it, while logs and action records use Masked only.
+type SecretFinding struct {
+	Engine      string // "rule" | "astrlink"
+	RuleID      string
+	Provider    string
+	Kind        string
+	Severity    string
+	Confidence  string
+	Path        string
+	Line        int
+	Column      int
+	Value       string
+	Masked      string
+	Fingerprint string
+	Score       float64
+	Note        string
+	Action      string
+	ActionZH    string
+	ActionJA    string
+}
+
+// SecretResult is the outcome of one content scan.
+type SecretResult struct {
+	Findings     []SecretFinding
+	FilesScanned int
+	FilesSkipped int
+	BytesRead    int64
+	StartedAt    time.Time
+	FinishedAt   time.Time
+	Limitations  []string
+}
+
+// AstrLinkStatus says whether the optional model is on disk and readable.
+type AstrLinkStatus struct {
+	Available bool
+	Dir       string
+	Bytes     int64
+	Note      string
 }
 
 // Action is one thing the user did, in order.

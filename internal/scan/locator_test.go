@@ -79,3 +79,44 @@ func hasTarget(targets []model.ScanTarget, kind, path string) bool {
 	}
 	return false
 }
+
+func TestFindTBSBrowser(t *testing.T) {
+	root := t.TempDir()
+	exe := filepath.Join(root, "intl_service", "tbs_browser.exe")
+	mustWrite(t, exe, "MZ")
+	if got, ok := FindTBSBrowser([]string{root}); !ok || filepath.Clean(got) != filepath.Clean(exe) {
+		t.Fatalf("plain install: got %q %v, want %q", got, ok, exe)
+	}
+
+	nested := t.TempDir()
+	nestedExe := filepath.Join(nested, "Launcher", "intl_service", "tbs_browser.exe")
+	mustWrite(t, nestedExe, "MZ")
+	if got, ok := FindTBSBrowser([]string{nested}); !ok || filepath.Clean(got) != filepath.Clean(nestedExe) {
+		t.Fatalf("Launcher subfolder: got %q %v, want %q", got, ok, nestedExe)
+	}
+	// The Launcher folder itself is accepted as the root too.
+	if got, ok := FindTBSBrowser([]string{filepath.Join(nested, "Launcher")}); !ok || filepath.Clean(got) != filepath.Clean(nestedExe) {
+		t.Fatalf("Launcher as root: got %q %v, want %q", got, ok, nestedExe)
+	}
+
+	// Duplicates and blanks do not change the answer.
+	if got, ok := FindTBSBrowser([]string{"", root, root}); !ok || filepath.Clean(got) != filepath.Clean(exe) {
+		t.Fatalf("duplicate roots: got %q %v, want %q", got, ok, exe)
+	}
+
+	if _, ok := FindTBSBrowser(nil); ok {
+		t.Fatal("empty roots must not resolve")
+	}
+	if _, ok := FindTBSBrowser([]string{t.TempDir()}); ok {
+		t.Fatal("a root without the exe must not resolve")
+	}
+
+	// A directory named tbs_browser.exe is not the exe.
+	dirRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dirRoot, "intl_service", "tbs_browser.exe"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := FindTBSBrowser([]string{dirRoot}); ok {
+		t.Fatal("a directory must not be treated as the exe")
+	}
+}

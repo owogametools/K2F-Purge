@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/owogametools/k2f-purge/internal/exposure"
 	"github.com/owogametools/k2f-purge/internal/model"
 )
 
@@ -196,6 +197,8 @@ func writeExposure(b *strings.Builder, r model.ReportData) {
 		b.WriteString("沒有偵測到存在的曝險路徑（或尚未掃描到）。\n")
 	}
 	b.WriteByte('\n')
+	exposure.WriteSecretSection(b, "洩漏的敏感資料（規則）", r.Exposure.Secrets)
+	exposure.WriteSecretSection(b, "洩漏的敏感資料（模型）", r.Exposure.AstrLink)
 }
 
 func writeNext(b *strings.Builder, r model.ReportData) {
