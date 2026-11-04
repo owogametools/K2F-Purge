@@ -24,7 +24,7 @@ func TestPreview(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	svc, err := service.New("K2F PURGE", "0.2.0", "windows", "amd64", "bee")
+	svc, err := service.New("K2F PURGE", "0.2.1", "windows", "amd64", "bee")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func previewApp(t *testing.T, svc *service.Service, now time.Time) *App {
 func render(t *testing.T, dir, name string, a *App, page Page) {
 	t.Helper()
 	a.Page = page
-	tt := ui.NewTester(a.View, 1340, 860)
+	tt := ui.NewTester(a.View, 1600, 1000)
 	tt.Frame()
 	img := tt.Image()
 	f, err := os.Create(filepath.Join(dir, name+".png"))

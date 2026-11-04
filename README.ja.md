@@ -8,7 +8,7 @@ NIKKE PC ランチャーのサプライチェーン侵害に対するオフラ�
 
 **公開済みの指標を見つける。インフラを遮断する。落ちたものを隔離する。持ち出された可能性を洗い出す。マシンの外には何も出さない。**
 
-K2F PURGE は Windows、Linux、macOS 向けのネイティブ Go デスクトップアプリです。UI は [mygo](https://github.com/egoist/mygo) で構築され、webview、HTML/JS、npm、cgo は使いません。UI はシステム言語に従い、英語・繁体字中国語・日本語を同梱します。既定は英語で、システム言語が中国語か日本語のときだけ切り替わります。ネットワーク通信は行いません。
+K2F PURGE は Windows、Linux、macOS 向けのネイティブ Go デスクトップアプリです。ネットワーク通信は行いません。
 
 | 走査 | 判定 | 露出 |
 |---|---|---|
@@ -78,7 +78,7 @@ go tool mygo build
 Windows では次を生成します：
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.2.0-amd64.exe`（NSIS インストーラー）
+- `build/windows-amd64/k2f-purge-setup-0.2.1-amd64.exe`（NSIS インストーラー）
 
 クロスコンパイル：
 
@@ -89,7 +89,7 @@ go tool mygo build -platform darwin/universal
 
 署名済み macOS `.app`／`.dmg` は macOS 上で作成する必要があります。Linux 向けに mygo ツールを実行すると tarball、Debian パッケージ、PKGBUILD も生成されます。Windows に NSIS がない場合、mygo ビルドツールが取得します。これはビルド時の処理で、アプリの動作ではありません。
 
-Windows、0.2.0 リリース時点で `go test ./...` は 12 パッケージ 110 テスト成功。`GOOS=linux go build ./...` と `GOOS=darwin go build ./...` も完了します。
+Windows、0.2.1 リリース時点で `go test ./...` は 12 パッケージ 110 テスト成功。`GOOS=linux go build ./...` と `GOOS=darwin go build ./...` も完了します。
 
 ## 自分で検証する
 

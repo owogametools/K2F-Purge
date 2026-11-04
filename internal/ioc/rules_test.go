@@ -43,7 +43,7 @@ func TestLoadEmbedded(t *testing.T) {
 	if !strings.Contains(got["temp.k2f_files"].Pattern, "k2f-b"+"creds-") {
 		t.Errorf("temp pattern missing dump prefix: %s", got["temp.k2f_files"].Pattern)
 	}
-	if len(r.Domains) != 3 || len(r.IPs) != 2 || len(r.SHA256) != 3 || len(r.ETags) != 5 {
+	if len(r.Domains) != 5 || len(r.IPs) != 2 || len(r.SHA256) != 3 || len(r.ETags) != 5 {
 		t.Errorf("ioc counts domains=%d ips=%d sha=%d etags=%d", len(r.Domains), len(r.IPs), len(r.SHA256), len(r.ETags))
 	}
 }

@@ -8,7 +8,7 @@ NIKKE PC 啟動器供應鏈投毒的離線應變工具。
 
 **找出已公開的指標。封鎖基礎設施。隔離已落地的東西。盤點可能被拿走的資料。不讓任何東西離開這台機器。**
 
-K2F PURGE 是原生 Go 桌面應用程式，支援 Windows、Linux 與 macOS。介面以 [mygo](https://github.com/egoist/mygo) 建構：沒有 webview、沒有 HTML/JS、沒有 npm、沒有 cgo。介面跟隨系統語言，內建英文、繁體中文與日文。預設英文；只有系統語言是中文或日文時才切換。程式不發任何網路請求。
+K2F PURGE 是原生 Go 桌面應用程式，支援 Windows、Linux 與 macOS。程式不發任何網路請求。
 
 | 掃描 | 判定 | 曝險 |
 |---|---|---|
@@ -78,7 +78,7 @@ go tool mygo build
 Windows 上會產生：
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.2.0-amd64.exe`（NSIS 安裝程式）
+- `build/windows-amd64/k2f-purge-setup-0.2.1-amd64.exe`（NSIS 安裝程式）
 
 交叉編譯：
 
@@ -89,7 +89,7 @@ go tool mygo build -platform darwin/universal
 
 簽署過的 macOS `.app`／`.dmg` 必須在 macOS 上產生。對 Linux 執行 mygo 工具也會產生 tarball、Debian 套件與 PKGBUILD。Windows 上若未安裝 NSIS，mygo 建置工具會下載它；這是建置階段行為，不是應用程式行為。
 
-在 Windows、0.2.0 版本，`go test ./...` 回報 12 個套件共 110 個測試通過。`GOOS=linux go build ./...` 與 `GOOS=darwin go build ./...` 也能完成。
+在 Windows、0.2.1 版本，`go test ./...` 回報 12 個套件共 110 個測試通過。`GOOS=linux go build ./...` 與 `GOOS=darwin go build ./...` 也能完成。
 
 ## 自行驗證
 

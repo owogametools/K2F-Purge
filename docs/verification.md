@@ -19,10 +19,10 @@ go tool mygo build
 
 Expected:
 
-- All tests pass. On Windows, the 0.2.0 suite reports 110 passing tests across 12 packages. On other platforms, use "all tests pass" as the criterion; the platform-specific test set differs.
+- All tests pass. On Windows, the 0.2.1 suite reports 110 passing tests across 12 packages. On other platforms, use "all tests pass" as the criterion; the platform-specific test set differs.
 - Both cross-builds complete.
 - The cgo-disabled build completes.
-- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe` and `build/windows-amd64/k2f-purge-setup-0.2.0-amd64.exe`.
+- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe` and `build/windows-amd64/k2f-purge-setup-0.2.1-amd64.exe`.
 
 The last command needs Go 1.27.3 because `go.mod` pins the mygo build tool with a `tool` directive.
 
@@ -46,7 +46,7 @@ Expected `version` and `iocs`:
 | Field | Expected |
 |---|---|
 | `version` | `2026-11-04.1` |
-| `domains` | `insightjs.com`, `analytics.insightjs.com`, `insightjs.org` |
+| `domains` | `insightjs.com`, `www.insightjs.com`, `analytics.insightjs.com`, `insightjs.org`, `www.insightjs.org` |
 | `ips` | `89.127.233.127`, `89.126.250.172` |
 | `sha256` | `2f2aac505f486067af6831d6c75ea74df63acb1ed4e4002709c5962c68bd9203`, `3aaafbd612f04501a6fdb0bb8b2f8a87796223e5584ac18ea5eb180feeafb193`, `cc0ad05bfe85940a6067b3a72c182d3953339129206634141926d5d0b35973ec` |
 | `etags` | `6ae78037-3214f`, `6ae8ccff-3214f`, `6ae90538-3214f`, `6ae9d408-3214f`, `6ae9f628-3214f` |

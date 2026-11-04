@@ -9,11 +9,11 @@ import (
 func (a *App) emptyState(c *ui.Context, title, body, action string, fn func()) {
 	ui.Column(c).Gap(14).Padding(28).Background(colSurface).Radius(12).Border(1, colLineSoft).Children(func() {
 		if cjkUI() {
-			ui.Text(c, title).FontSize(22).TextColor(colInk)
+			ui.Text(c, title).FontSize(34).TextColor(colInk)
 		} else {
 			display(c, upper(title), 34, colInk)
 		}
-		ui.Text(c, body).FontSize(13).TextColor(colMuted)
+		ui.Text(c, body).FontSize(26).TextColor(colMuted)
 		ui.Row(c).Gap(10).Children(func() {
 			a.actionButton(c, action, true, fn)
 		})

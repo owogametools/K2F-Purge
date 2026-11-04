@@ -13,8 +13,8 @@ func coverage(c *ui.Context, num, title, detail string) {
 		Background(colSurface).Radius(9).Border(1, colLineSoft)
 	p.Children(func() {
 		micro(c, num, colAcid)
-		ui.Text(c, title).FontSize(13).TextColor(colInk)
-		mono(c, detail, 9, colDim).SingleLine()
+		ui.Text(c, title).FontSize(26).TextColor(colInk)
+		mono(c, detail, 18, colDim)
 	})
 }
 
@@ -60,11 +60,11 @@ func (a *App) scanPage(c *ui.Context) {
 				a.ghostButton(c, tr("Cancel", "取消", "中止"), a.Svc.Cancel)
 			}
 			ui.Spacer(c)
-			mono(c, tr("Read-only · nothing is changed", "只讀取，不改動任何檔案。", "読み取り専用・何も変更しません"), 10, colDim)
+			mono(c, tr("Read-only · nothing is changed", "只讀取，不改動任何檔案。", "読み取り専用・何も変更しません"), 20, colDim)
 		})
 
 		if a.Progress.Current != "" {
-			mono(c, clamp(a.Progress.Current, 110), 10, colMuted)
+			mono(c, clamp(a.Progress.Current, 110), 20, colMuted)
 		}
 
 		if len(a.Targets) > 0 {
@@ -87,7 +87,7 @@ func (a *App) scanPage(c *ui.Context) {
 			ui.Row(c).AlignItems(ui.Center).Children(func() {
 				micro(c, tr("Live evidence stream", "即時證據流", "証拠ストリーム"), colDim)
 				ui.Spacer(c)
-				mono(c, trf("%d lines", "%d 行", "%d 行", len(a.ScanLog)), 9, colDim)
+				mono(c, trf("%d lines", "%d 行", "%d 行", len(a.ScanLog)), 18, colDim)
 			})
 			ui.Box(c).Height(1).FillWidth().Background(colLineSoft)
 			ui.Scroll(c).Grow(1).TrackScroll(&a.LogScroll).Children(func() {
@@ -97,7 +97,7 @@ func (a *App) scanPage(c *ui.Context) {
 						start = len(a.ScanLog) - 16
 					}
 					if len(a.ScanLog) == 0 {
-						mono(c, tr("waiting for the first pass…", "等待首輪結果…", "初回の結果を待っています…"), 10, colDim)
+						mono(c, tr("waiting for the first pass…", "等待首輪結果…", "初回の結果を待っています…"), 20, colDim)
 						return
 					}
 					for _, line := range a.ScanLog[start:] {
@@ -110,20 +110,20 @@ func (a *App) scanPage(c *ui.Context) {
 						case strings.HasPrefix(line, "target"):
 							color = colDim
 						}
-						mono(c, line, 10, color).SingleLine()
+						mono(c, line, 20, color).SingleLine()
 					}
 				})
 			})
 		})
 
-		ui.Row(c).Gap(10).Children(func() {
+		ui.Row(c).Gap(10).AlignItems(ui.Stretch).Children(func() {
 			coverage(c, "01", tr("Launcher logs", "啟動器日誌", "起動ログ"), "debug.log · tinyget")
-			coverage(c, "02", tr("V8 code cache", "V8 快取", "V8 キャッシュ"), "4 loader keys · insightjs")
+			coverage(c, "02", tr("V8 code cache", "V8 快取", "V8 キャッシュ"), "4 keys · insightjs")
 			coverage(c, "03", tr("Local storage", "本機儲存", "ローカル保存"), "k2f.agent.state")
 			coverage(c, "04", tr("Chrome helper", "Chrome 幫手", "Chrome 補助"), "64-hex DLL · HKCU CLSID")
 		})
 
 		ui.Text(c, tr("The scanner only reads. It never writes, uploads, or opens a credential file.", "掃描只讀取。不寫入、不上傳、不打開憑證檔。", "走査は読み取りのみです。書き込み・送信・資格情報の閲覧はしません。")).
-			FontSize(12).TextColor(colDim)
+			FontSize(24).TextColor(colDim)
 	})
 }

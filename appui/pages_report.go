@@ -22,7 +22,7 @@ func (a *App) reportPage(c *ui.Context) {
 		ui.Column(c).Gap(2).Children(func() {
 			micro(c, tr("Step 06 / Report", "步驟 06 / 報告", "手順 06 / 報告"), colAcid)
 			display(c, "REPORT", 86, colInk)
-			mono(c, tr("Everything the app saw and did, in one file. Saved locally, never uploaded.", "本機所見所做，寫成一份檔。只存本機，不上傳。", "本アプリが見て行ったことを1ファイルに。端末内のみ、送信しません。"), 12, colMuted)
+			mono(c, tr("Everything the app saw and did, in one file. Saved locally, never uploaded.", "本機所見所做，寫成一份檔。只存本機，不上傳。", "本アプリが見て行ったことを1ファイルに。端末内のみ、送信しません。"), 24, colMuted)
 		})
 
 		ui.Row(c).Gap(40).Children(func() {
@@ -44,7 +44,7 @@ func (a *App) reportPage(c *ui.Context) {
 			a.actionButton(c, tr("Save report", "儲存報告", "報告を保存"), true, a.saveReport)
 			ui.Spacer(c)
 			if a.ReportPath != "" {
-				mono(c, clamp(a.ReportPath, 110), 10, colMuted).SingleLine()
+				mono(c, clamp(a.ReportPath, 110), 20, colMuted).SingleLine()
 			}
 		})
 
@@ -53,14 +53,14 @@ func (a *App) reportPage(c *ui.Context) {
 		ui.Column(c).Gap(6).Children(func() {
 			micro(c, tr("Actions this session", "本次動作", "今回の操作"), colDim)
 			if len(data.Actions) == 0 {
-				mono(c, tr("Nothing yet.", "尚無。", "まだありません。"), 10, colDim)
+				mono(c, tr("Nothing yet.", "尚無。", "まだありません。"), 20, colDim)
 				return
 			}
 			for _, act := range data.Actions {
 				ui.Row(c).Gap(12).Children(func() {
-					mono(c, act.At.Format("15:04:05"), 9, colDim).Width(70)
-					mono(c, upper(act.Kind), 9, colAcid).Width(80)
-					mono(c, clamp(act.Detail, 120), 10, colMuted).SingleLine()
+					mono(c, act.At.Format("15:04:05"), 18, colDim).Width(120)
+					mono(c, upper(act.Kind), 18, colAcid).Width(140)
+					mono(c, clamp(act.Detail, 120), 20, colMuted).SingleLine()
 				})
 			}
 		})
@@ -75,8 +75,8 @@ func (a *App) reportPage(c *ui.Context) {
 				tr("Replace reinstalling the operating system, which the public report calls the safest option.", "不能代替重裝系統——公開報告認為那才最安全。", "OS 再インストールの代わりにはなりません。公開報告はそれが最も安全だとしています。"),
 			} {
 				ui.Row(c).Gap(8).Children(func() {
-					mono(c, "—", 10, colWarn)
-					ui.Text(c, line).FontSize(12).TextColor(colMuted).Grow(1)
+					mono(c, "—", 20, colWarn)
+					ui.Text(c, line).FontSize(24).TextColor(colMuted).Grow(1)
 				})
 			}
 		})

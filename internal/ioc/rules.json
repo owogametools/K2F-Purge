@@ -229,8 +229,10 @@
   "iocs": {
     "domains": [
       "insightjs.com",
+      "www.insightjs.com",
       "analytics.insightjs.com",
-      "insightjs.org"
+      "insightjs.org",
+      "www.insightjs.org"
     ],
     "ips": [
       "89.127.233.127",

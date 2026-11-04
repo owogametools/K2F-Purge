@@ -61,8 +61,10 @@ func applyTheme(c *ui.Context) {
 	t.Selection = ui.RGBA(200, 255, 0, 0.28)
 	t.Focus = colAcid
 	t.Radius = 10
-	t.Spacing = 4
-	t.FontSize = 14
+	// Spacing sizes check boxes, text inputs and segmented controls; it moves
+	// with FontSize so those controls stay proportional to the 2x reading text.
+	t.Spacing = 8
+	t.FontSize = 28
 	c.SetTheme(t)
 }
 
@@ -78,7 +80,7 @@ func mono(c *ui.Context, s string, size float32, color ui.Color) ui.Element {
 
 // micro is an all-caps mono label with tracking, used above sections.
 func micro(c *ui.Context, s string, color ui.Color) ui.Element {
-	return ui.Text(c, upper(s)).Font(fontMono).FontSize(10).LetterSpacing(1.6).TextColor(color)
+	return ui.Text(c, upper(s)).Font(fontMono).FontSize(20).LetterSpacing(1.6).TextColor(color)
 }
 
 func upper(s string) string {

@@ -41,7 +41,7 @@ func main() {
 		appVersion = mygo.App.Version()
 	}
 	if appVersion == "" {
-		appVersion = "0.2.0"
+		appVersion = "0.2.1"
 	}
 	username := ""
 	if u, err := user.Current(); err == nil {
@@ -57,10 +57,10 @@ func main() {
 	mygo.App.WhenReady(func() {
 		w := mygo.NewWindow(mygo.WindowOptions{
 			Title:             "K2F PURGE",
-			Width:             1340,
-			Height:            860,
-			MinWidth:          1100,
-			MinHeight:         720,
+			Width:             1600,
+			Height:            1000,
+			MinWidth:          1280,
+			MinHeight:         860,
 			StateKey:          "main",
 			Frameless:         true,
 			TitleBarStyle:     mygo.TitleBarHidden,

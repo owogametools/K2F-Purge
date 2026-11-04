@@ -29,7 +29,7 @@ func (a *App) verdictPage(c *ui.Context) {
 		ui.Column(c).Gap(2).Children(func() {
 			micro(c, tr("Step 02 / Verdict", "步驟 02 / 判定", "手順 02 / 判定"), colAcid)
 			display(c, a.Scan.Verdict, 86, verdictColor(a.Scan.Verdict))
-			mono(c, a.verdictSentence(), 12, colMuted)
+			mono(c, a.verdictSentence(), 24, colMuted)
 		})
 
 		ui.Row(c).Gap(40).Children(func() {
@@ -46,7 +46,7 @@ func (a *App) verdictPage(c *ui.Context) {
 			p.Children(func() {
 				micro(c, tr("No listed indicator matched", "未命中已知指標", "既知指標に未一致"), colAcid)
 				ui.Text(c, tr("That does not prove the machine is clean. It means none of the indicators from the public report were found, and only where the scanner could look.", "這不代表電腦乾淨。只代表公開報告的指標，在掃得到的地方都沒找到。", "清潔とは限りません。公開報告の指標が、走査できた範囲で見つからなかっただけです。")).
-					FontSize(13).TextColor(colMuted)
+					FontSize(26).TextColor(colMuted)
 			})
 		} else {
 			ui.Column(c).Gap(10).Children(func() {
@@ -63,8 +63,8 @@ func (a *App) verdictPage(c *ui.Context) {
 				micro(c, tr("Limits of this scan", "本次限制", "今回の制限"), colWarn)
 				for _, l := range a.Scan.Limitations {
 					ui.Row(c).Gap(8).Children(func() {
-						mono(c, "—", 10, colWarn)
-						ui.Text(c, l).FontSize(12).TextColor(colMuted).Grow(1)
+						mono(c, "—", 20, colWarn)
+						ui.Text(c, l).FontSize(24).TextColor(colMuted).Grow(1)
 					})
 				}
 			})
@@ -124,22 +124,22 @@ func (a *App) findingCard(c *ui.Context, f model.Finding) {
 	p.Children(func() {
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
 			chip(c, strings.ToUpper(f.Confidence), severityColor(f.Severity))
-			mono(c, f.RuleID, 10, colAcid)
+			mono(c, f.RuleID, 20, colAcid)
 			ui.Spacer(c)
 			if !f.MTime.IsZero() {
-				mono(c, f.MTime.Format("2006-01-02 15:04"), 9, colDim)
+				mono(c, f.MTime.Format("2006-01-02 15:04"), 18, colDim)
 			}
 		})
-		ui.Text(c, findingTitle(f)).FontSize(15).TextColor(colInk)
+		ui.Text(c, findingTitle(f)).FontSize(30).TextColor(colInk)
 		if d := findingDetail(f); d != "" {
-			mono(c, clamp(d, 170), 10, colDim).SingleLine()
+			mono(c, clamp(d, 170), 20, colDim).SingleLine()
 		}
-		mono(c, clamp(f.Path, 130), 10, colMuted).SingleLine()
+		mono(c, clamp(f.Path, 130), 20, colMuted).SingleLine()
 		if f.Snippet != "" {
-			mono(c, clamp(f.Snippet, 150), 10, colDim).SingleLine()
+			mono(c, clamp(f.Snippet, 150), 20, colDim).SingleLine()
 		}
 		if f.SHA256 != "" {
-			mono(c, "sha256 "+f.SHA256, 9, colDim).SingleLine()
+			mono(c, "sha256 "+f.SHA256, 18, colDim).SingleLine()
 		}
 	})
 	if p.Hovered() {

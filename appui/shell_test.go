@@ -13,22 +13,22 @@ func TestRailLanguageMenuFitsMinimumWindow(t *testing.T) {
 	resetLangState()
 	t.Cleanup(resetLangState)
 	a := busyScanApp()
-	tt := ui.NewTester(a.View, 1100, 720)
+	tt := ui.NewTester(a.View, 1280, 860)
 	tt.Frame()
 
 	trigger, ok := tt.Find("Auto (system)")
 	if !ok {
 		t.Fatalf("language trigger missing; texts: %v", tt.Texts())
 	}
-	if trigger.Y+trigger.H > 720 {
-		t.Fatalf("language trigger at %v is below the 720px window", trigger)
+	if trigger.Y+trigger.H > 860 {
+		t.Fatalf("language trigger at %v is below the 860px window", trigger)
 	}
 	footer, ok := tt.Find("NOT AN ANTIVIRUS · NO NETWORK")
 	if !ok {
 		t.Fatal("footer missing")
 	}
-	if footer.Y+footer.H > 720 {
-		t.Fatalf("footer at %v is below the 720px window", footer)
+	if footer.Y+footer.H > 860 {
+		t.Fatalf("footer at %v is below the 860px window", footer)
 	}
 }
 

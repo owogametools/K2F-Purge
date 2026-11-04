@@ -9,7 +9,7 @@ func (a *App) blockPage(c *ui.Context) {
 		ui.Column(c).Gap(2).Children(func() {
 			micro(c, tr("Step 03 / Containment", "步驟 03 / 圍堵", "手順 03 / 封じ込め"), colAcid)
 			display(c, "BLOCK", 86, colInk)
-			mono(c, tr("Stop the current infrastructure. This does not undo an infection.", "切斷現用基礎設施。無法撤銷感染。", "現行のインフラを遮断します。感染は取り消せません。"), 12, colMuted)
+			mono(c, tr("Stop the current infrastructure. This does not undo an infection.", "切斷現用基礎設施。無法撤銷感染。", "現行のインフラを遮断します。感染は取り消せません。"), 24, colMuted)
 		})
 
 		ui.Row(c).Gap(16).AlignItems(ui.Start).Children(func() {
@@ -35,18 +35,18 @@ func (a *App) blockPage(c *ui.Context) {
 				micro(c, tr("Indicators", "指標", "指標"), colDim)
 				for _, d := range a.BlockPlan.Domains {
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-						mono(c, "HOST", 9, colAcid)
-						mono(c, d, 11, colInk)
+						mono(c, "HOST", 18, colAcid)
+						mono(c, d, 22, colInk)
 					})
 				}
 				for _, ip := range a.BlockPlan.IPs {
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-						mono(c, "IP", 9, colWarn)
-						mono(c, ip, 11, colInk)
+						mono(c, "IP", 18, colWarn)
+						mono(c, ip, 22, colInk)
 					})
 				}
 				ui.Text(c, tr("Domains are pinned in the hosts file. IPs are dropped outbound by the system firewall.", "網域寫入 hosts。IP 由系統防火牆擋出站。", "ドメインは hosts に固定。IP はファイアウォールで送信を遮断します。")).
-					FontSize(11).TextColor(colDim)
+					FontSize(22).TextColor(colDim)
 			})
 		})
 
@@ -62,10 +62,10 @@ func (a *App) blockPage(c *ui.Context) {
 					a.statusLine(c, tr("Persisted across reboot", "重開機後仍在", "再起動後も有効"), true, "")
 				}
 				for _, w := range a.Block.Warnings {
-					mono(c, "WARN  "+w, 10, colWarn).SingleLine()
+					mono(c, "WARN  "+w, 20, colWarn).SingleLine()
 				}
 				for _, f := range a.Block.Failures {
-					mono(c, "FAIL  "+f, 10, colDanger).SingleLine()
+					mono(c, "FAIL  "+f, 20, colDanger).SingleLine()
 				}
 			})
 		}
@@ -77,7 +77,7 @@ func (a *App) blockPage(c *ui.Context) {
 				a.statusLine(c, tr("Domains resolve to a sinkhole", "網域解析到黑洞", "ドメインはシンクホールへ"), a.Verify.HostsOK, a.Verify.HostsDetail)
 				a.statusLine(c, tr("Firewall rules are present", "防火牆規則已在", "FW 規則あり"), a.Verify.FirewallOK, "")
 				for _, n := range a.Verify.FirewallNotes {
-					mono(c, "  "+n, 10, colDim).SingleLine()
+					mono(c, "  "+n, 20, colDim).SingleLine()
 				}
 			})
 		}
@@ -98,10 +98,10 @@ func (a *App) statusLine(c *ui.Context, label string, ok bool, detail string) {
 		mark, color = "✓", colAcid
 	}
 	ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-		mono(c, mark, 11, color)
-		ui.Text(c, label).FontSize(12).TextColor(colInk).Grow(1)
+		mono(c, mark, 22, color)
+		ui.Text(c, label).FontSize(24).TextColor(colInk).Grow(1)
 		if detail != "" {
-			mono(c, clamp(detail, 80), 10, colDim).SingleLine()
+			mono(c, clamp(detail, 80), 20, colDim).SingleLine()
 		}
 	})
 }

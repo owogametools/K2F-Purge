@@ -48,7 +48,7 @@ func (a *App) exposurePage(c *ui.Context) {
 		ui.Column(c).Gap(2).Children(func() {
 			micro(c, tr("Step 05 / Exposure", "步驟 05 / 曝險", "手順 05 / 露出"), colAcid)
 			display(c, "EXPOSURE", 86, colInk)
-			mono(c, tr("If the agent ran, assume every secret below was readable. This list only checks whether the path exists.", "若 agent 曾執行，下列機密都可能被讀。只檢查路徑是否存在。", "エージェントが動いていれば、以下の機密は読まれた前提です。経路の有無だけ確認します。"), 12, colMuted)
+			mono(c, tr("If the agent ran, assume every secret below was readable. This list only checks whether the path exists.", "若 agent 曾執行，下列機密都可能被讀。只檢查路徑是否存在。", "エージェントが動いていれば、以下の機密は読まれた前提です。経路の有無だけ確認します。"), 24, colMuted)
 		})
 
 		if a.Exposure == nil {
@@ -74,8 +74,8 @@ func (a *App) exposurePage(c *ui.Context) {
 		ui.Column(c).Gap(6).Children(func() {
 			for _, cat := range a.Exposure.Categories {
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-					ui.Column(c).Width(140).Children(func() {
-						mono(c, categoryLabel(cat.Name), 10, colInk)
+					ui.Column(c).Width(220).Children(func() {
+						mono(c, categoryLabel(cat.Name), 20, colInk)
 					})
 					bar := ui.Box(c).Height(3).Grow(1).Background(colLineSoft)
 					bar.Children(func() {
@@ -85,7 +85,7 @@ func (a *App) exposurePage(c *ui.Context) {
 						}
 						ui.Box(c).Height(3).WidthPercent(percent(cat.Present, cat.Total)).Background(color)
 					})
-					mono(c, fmt.Sprintf("%d / %d", cat.Present, cat.Total), 9, colDim).Width(64)
+					mono(c, fmt.Sprintf("%d / %d", cat.Present, cat.Total), 18, colDim).Width(120)
 				})
 			}
 		})
@@ -117,7 +117,7 @@ func (a *App) exposurePage(c *ui.Context) {
 			}
 		})
 		if shown == 0 {
-			mono(c, tr("No item matches the filter.", "沒有符合的項目。", "該当なし。"), 10, colDim)
+			mono(c, tr("No item matches the filter.", "沒有符合的項目。", "該当なし。"), 20, colDim)
 		}
 	})
 }
@@ -127,16 +127,16 @@ func (a *App) exposureRow(c *ui.Context, it model.ExposureItem) {
 	if it.Exists {
 		dot = severityColor(it.Severity)
 	}
-	row := ui.Row(c).Gap(10).Padding(6, 8).Radius(6).AlignItems(ui.Center)
+	row := ui.Row(c).Gap(12).Padding(8, 12).Radius(6).AlignItems(ui.Center)
 	row.Children(func() {
-		ui.Box(c).Size(5, 5).Radius(3).Background(dot)
-		mono(c, clamp(it.Label, 42), 10, colInk).Width(210).SingleLine()
-		mono(c, clamp(it.Path, 96), 10, colMuted).Grow(1).SingleLine()
-		mono(c, categoryLabel(it.Category), 9, colDim).Width(92)
+		ui.Box(c).Size(10, 10).Radius(5).Background(dot)
+		mono(c, clamp(it.Label, 42), 20, colInk).Width(320).SingleLine()
+		mono(c, clamp(it.Path, 96), 20, colMuted).Grow(1).SingleLine()
+		mono(c, categoryLabel(it.Category), 18, colDim).Width(160)
 		if it.Exists {
-			mono(c, tr("PRESENT", "存在", "存在"), 9, dot)
+			mono(c, tr("PRESENT", "存在", "存在"), 18, dot)
 		} else {
-			mono(c, "—", 9, colDim)
+			mono(c, "—", 18, colDim)
 		}
 	})
 	if row.Hovered() && it.Exists {

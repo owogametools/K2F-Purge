@@ -146,12 +146,12 @@ func (a *App) stage(c *ui.Context) {
 		if a.Busy {
 			ui.Row(c).Padding(24, 40).Gap(12).AlignItems(ui.Center).Children(func() {
 				ui.Spinner(c)
-				mono(c, upper(a.BusyLabel), 11, colAcid)
+				mono(c, upper(a.BusyLabel), 22, colAcid)
 				if a.Progress.Total > 0 {
-					mono(c, fmt.Sprintf("%d / %d", a.Progress.Done, a.Progress.Total), 11, colMuted)
+					mono(c, fmt.Sprintf("%d / %d", a.Progress.Done, a.Progress.Total), 22, colMuted)
 				}
 				if a.Progress.Current != "" {
-					mono(c, clamp(a.Progress.Current, 72), 11, colMuted)
+					mono(c, clamp(a.Progress.Current, 72), 22, colMuted)
 				}
 				ui.Spacer(c)
 				a.ghostButton(c, tr("Cancel", "取消", "中止"), a.Svc.Cancel)
@@ -160,13 +160,13 @@ func (a *App) stage(c *ui.Context) {
 		}
 		if a.Err != "" {
 			ui.Row(c).Padding(20, 40).Gap(12).AlignItems(ui.Center).Background(ui.RGBA(255, 59, 31, 0.08)).Children(func() {
-				mono(c, tr("ERROR", "錯誤", "ERROR"), 11, colDanger)
-				ui.Text(c, a.Err).FontSize(13).TextColor(colInk).Grow(1)
+				mono(c, tr("ERROR", "錯誤", "ERROR"), 22, colDanger)
+				ui.Text(c, a.Err).FontSize(26).TextColor(colInk).Grow(1)
 				a.ghostButton(c, tr("Dismiss", "關閉", "閉じる"), func() { a.Err = "" })
 			})
 		}
 		ui.Scroll(c).Grow(1).Fill().Children(func() {
-			ui.Column(c).Padding(32, 44).Gap(24).Children(func() {
+			ui.Column(c).Padding(40, 52).Gap(32).Children(func() {
 				switch a.Page {
 				case PageScan:
 					a.scanPage(c)
