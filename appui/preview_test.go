@@ -66,7 +66,9 @@ func previewApp(t *testing.T, svc *service.Service, now time.Time) *App {
 		LauncherPath: launcher,
 		TBSExe:       filepath.Join(launcher, "intl_service", "tbs_browser.exe"),
 	}
-	a.LauncherDraft = launcher
+	// The temp fixture folder is for validation only; never show its path in
+	// a rendered preview or screenshot.
+	a.LauncherPath, a.LauncherDraft = "", ""
 	a.BlockPlan.BlockTBSBrowser = true
 	a.Scan = &model.ScanResult{
 		Verdict:    model.VerdictConfirmed,
