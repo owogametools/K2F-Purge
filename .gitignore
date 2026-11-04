@@ -1,0 +1,15 @@
+# Build outputs
+/build/
+/.mygo/
+/dist/
+/quarantine/
+*.exe
+*.test
+*.db
+
+# Local machine state
+.DS_Store
+Thumbs.db
+/.claude/settings.local.json
+/.claude/worktrees/
+/.trellis/.runtime/

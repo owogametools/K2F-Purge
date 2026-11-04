@@ -1,0 +1,154 @@
+# Tag-driven desktop release for THIS repository.
+#
+# This repo intentionally ships source — it is security software.
+# Assets are published here with GITHUB_TOKEN only (Release author =
+# github-actions[bot]). No cross-repo handoff, no PAT, and no artifact
+# upload/download actions: each matrix job builds and uploads its own asset
+# directly to the GitHub Release.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+# Keyed on the tag so a re-push of the same tag queues instead of
+# interleaving uploads. Do not cancel: a half-finished Release is worse.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            target: windows-amd64
+            archive: zip
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            target: linux-amd64
+            archive: tar.gz
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            target: darwin-arm64
+            archive: tar.gz
+          # Cross-compile on the arm64 macOS runner: this app has no cgo.
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            target: darwin-amd64
+            archive: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.3"
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build (Windows, mygo)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          go tool mygo build -platform windows/amd64
+          $dir = 'build/windows-amd64'
+          if (-not (Test-Path -LiteralPath $dir)) {
+            throw "mygo did not write $dir"
+          }
+          # mygo names the portable exe after mygo.json's "name".
+          $exe = Join-Path $dir 'K2F PURGE.exe'
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "missing $exe"
+          }
+          $setup = @(Get-ChildItem -LiteralPath $dir -Filter 'k2f-purge-setup-*-amd64.exe' -File)
+          if ($setup.Count -lt 1) {
+            throw "missing installer k2f-purge-setup-<version>-amd64.exe in $dir"
+          }
+          Get-ChildItem -LiteralPath $dir | Format-Table Name, Length
+
+      - name: Build (Unix)
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # main.go declares `var version`, stamped with -X so the binary
+          # reports the tag it was built from.
+          version="${GITHUB_REF_NAME#v}"
+          CGO_ENABLED=0 GOOS="${{ matrix.goos }}" GOARCH="${{ matrix.goarch }}" \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" -o k2f-purge .
+          test -f k2f-purge
+
+      - name: Package Windows zip
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $zip = 'dist/k2f-purge-${{ matrix.target }}.zip'
+          if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
+          # Zip contains the portable exe and the NSIS installer, both at zip root.
+          Compress-Archive -Path 'build/windows-amd64/*' -DestinationPath $zip -Force
+          Get-Item -LiteralPath $zip | Format-List Name, Length, FullName
+
+      - name: Package Unix tarball
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # COPYFILE_DISABLE keeps macOS tar from injecting AppleDouble ._* files.
+          COPYFILE_DISABLE=1 tar -czf "dist/k2f-purge-${{ matrix.target }}.tar.gz" k2f-purge
+          ls -la "dist/k2f-purge-${{ matrix.target }}.tar.gz"
+
+      # One Release, many jobs: every matrix cell uploads its own asset.
+      # First job to arrive creates the Release; the rest reuse it.
+      # If two creates collide, the loser falls through to `gh release view`,
+      # which must succeed because the winner already created it.
+      - name: Ensure GitHub Release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              --verify-tag \
+              --target "${{ github.sha }}" \
+              || gh release view "$TAG" >/dev/null
+          fi
+
+      - name: Upload asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="dist/k2f-purge-${{ matrix.target }}.${{ matrix.archive }}"
+          test -f "$asset"
+          gh release upload "$TAG" "$asset" --clobber
+          gh release view "$TAG"
