@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -61,8 +62,12 @@ func TestScanWithHomeLstatOnly(t *testing.T) {
 		}
 	}
 	if !foundNikke {
-		// On non-windows, %APPDATA% maps to ~/.config
+		// %APPDATA% maps per OS: ~/.config on Linux, ~/Library/Application
+		// Support on macOS. Try the other one before failing.
 		alt := filepath.Join(home, ".config", "nikke_launcher")
+		if runtime.GOOS == "darwin" {
+			alt = filepath.Join(home, "Library", "Application Support", "nikke_launcher")
+		}
 		if err := os.MkdirAll(alt, 0o700); err != nil {
 			t.Fatal(err)
 		}
