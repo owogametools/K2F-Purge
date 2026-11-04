@@ -62,6 +62,7 @@ func scanAll(ctx context.Context, env Env, opts model.ExposureOptions, emit func
 		for _, pfx := range prefixes {
 			for _, user := range wineUsers(pfx) {
 				wenv := env
+				wenv.HostOS = env.GOOS
 				wenv.GOOS = "windows"
 				wenv.WinePrefix = pfx
 				wenv.WineUser = user

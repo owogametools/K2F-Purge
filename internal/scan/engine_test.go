@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -117,6 +118,9 @@ func TestRun_KnownHash(t *testing.T) {
 }
 
 func TestRun_RegistryHook(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the registry reader is Windows-only")
+	}
 	_, p := fixturePaths(t, "windows")
 	writeCleanLauncher(t, p)
 	orig := registryQuery

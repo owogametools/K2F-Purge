@@ -16,6 +16,17 @@ type Env struct {
 	AbsRoot    string // if set, C:\ is remapped here (tests / ScanWithHome)
 	WinePrefix string
 	WineUser   string
+	// HostOS is the OS whose filesystem holds the paths. Inside a Wine
+	// prefix on Linux or macOS the variables are Windows ones (GOOS stays
+	// "windows") but the separators must be the host's.
+	HostOS string
+}
+
+func (e Env) hostOS() string {
+	if e.HostOS != "" {
+		return e.HostOS
+	}
+	return e.GOOS
 }
 
 // Resolved is one catalog path after OS / env / glob-prefix mapping.
@@ -42,14 +53,14 @@ func (e Env) getenv(name string) string {
 }
 
 func (e Env) sep() string {
-	if e.GOOS == "windows" {
+	if e.hostOS() == "windows" {
 		return `\`
 	}
 	return `/`
 }
 
 func (e Env) toSep(s string) string {
-	if e.GOOS == "windows" {
+	if e.hostOS() == "windows" {
 		return strings.ReplaceAll(s, `/`, `\`)
 	}
 	return strings.ReplaceAll(s, `\`, `/`)
