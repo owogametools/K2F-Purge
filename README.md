@@ -84,7 +84,7 @@ The fetch step is needed for release packaging. It downloads the three model fil
 On Windows this writes:
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.3.1-amd64.exe` (NSIS installer)
+- `build/windows-amd64/k2f-purge-setup-0.3.2-amd64.exe` (NSIS installer)
 
 Cross-compilation:
 
@@ -95,7 +95,7 @@ go tool mygo build -platform darwin/universal
 
 A signed macOS `.app`/`.dmg` must be produced on macOS. Running the mygo tool for Linux also produces a tarball, Debian package, and PKGBUILD. If NSIS is not installed on Windows, the mygo build tool downloads it; that is a build-time step, not application behavior.
 
-At the 0.3.1 release, `go test ./...` passes on Windows. `GOOS=linux go build ./...` and `GOOS=darwin go build ./...` also complete.
+At the 0.3.2 release, `go test ./...` passes on Windows. `GOOS=linux go build ./...` and `GOOS=darwin go build ./...` also complete.
 
 ## Verify it yourself
 

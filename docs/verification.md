@@ -24,11 +24,11 @@ Expected:
 - Both cross-builds complete.
 - The cgo-disabled build completes.
 - The fetch script downloads the three model files into `resources/astrlink-guard/7216b6a3b897/`, verifies the exact size and SHA-256 listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md), and skips files that are already valid. Re-running it is a no-op.
-- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe`, `build/windows-amd64/k2f-purge-setup-0.3.1-amd64.exe`, and copies `astrlink-guard/7216b6a3b897/` next to the exe.
+- `go tool mygo build` writes `build/windows-amd64/K2F PURGE.exe`, `build/windows-amd64/k2f-purge-setup-0.3.2-amd64.exe`, and copies `astrlink-guard/7216b6a3b897/` next to the exe.
 
 The last command needs Go 1.27.3 because `go.mod` pins the mygo build tool with a `tool` directive.
 
-CI (`.github/workflows/ci.yml`) runs `gofmt -l`, `go vet ./...`, `go test ./...`, and cgo-disabled Linux and macOS cross-builds on every push and pull request. The tag-driven release workflow fetches and verifies the model before building, then includes it in the Windows zip/installer and in the Linux and macOS tarballs.
+CI (`.github/workflows/ci.yml`) runs `gofmt -l`, `go vet ./...`, `go test ./...`, and cgo-disabled Linux and macOS cross-builds on every push and pull request. The tag-driven release workflow fetches and verifies the model before building. Windows publishes two independent assets: `k2f-purge-windows-amd64-portable.zip` (the exe, `astrlink-guard/`, and `THIRD_PARTY_NOTICES.md`) and `k2f-purge-windows-amd64-setup.exe` (the NSIS installer, which embeds its own copy of the model). Linux and macOS publish their tarballs unchanged.
 
 ## 2. Compare the ruleset with the public record
 

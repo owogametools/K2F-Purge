@@ -84,7 +84,7 @@ go tool mygo build
 Windows 上會產生：
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.3.1-amd64.exe`（NSIS 安裝程式）
+- `build/windows-amd64/k2f-purge-setup-0.3.2-amd64.exe`（NSIS 安裝程式）
 
 交叉編譯：
 
@@ -95,7 +95,7 @@ go tool mygo build -platform darwin/universal
 
 簽署過的 macOS `.app`／`.dmg` 必須在 macOS 上產生。對 Linux 執行 mygo 工具也會產生 tarball、Debian 套件與 PKGBUILD。Windows 上若未安裝 NSIS，mygo 建置工具會下載它；這是建置階段行為，不是應用程式行為。
 
-在 0.3.1 版本，Windows 上 `go test ./...` 全數通過。`GOOS=linux go build ./...` 與 `GOOS=darwin go build ./...` 也能完成。
+在 0.3.2 版本，Windows 上 `go test ./...` 全數通過。`GOOS=linux go build ./...` 與 `GOOS=darwin go build ./...` 也能完成。
 
 ## 自行驗證
 

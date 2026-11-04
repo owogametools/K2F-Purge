@@ -84,7 +84,7 @@ go tool mygo build
 Windows では次を生成します：
 
 - `build/windows-amd64/K2F PURGE.exe`
-- `build/windows-amd64/k2f-purge-setup-0.3.1-amd64.exe`（NSIS インストーラー）
+- `build/windows-amd64/k2f-purge-setup-0.3.2-amd64.exe`（NSIS インストーラー）
 
 クロスコンパイル：
 
@@ -95,7 +95,7 @@ go tool mygo build -platform darwin/universal
 
 署名済み macOS `.app`／`.dmg` は macOS 上で作成する必要があります。Linux 向けに mygo ツールを実行すると tarball、Debian パッケージ、PKGBUILD も生成されます。Windows に NSIS がない場合、mygo ビルドツールが取得します。これはビルド時の処理で、アプリの動作ではありません。
 
-0.3.1 リリース時点で、Windows の `go test ./...` は成功します。`GOOS=linux go build ./...` と `GOOS=darwin go build ./...` も完了します。
+0.3.2 リリース時点で、Windows の `go test ./...` は成功します。`GOOS=linux go build ./...` と `GOOS=darwin go build ./...` も完了します。
 
 ## 自分で検証する
 
